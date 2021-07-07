@@ -1,4 +1,6 @@
-This is deployed at <https://ns.polyneme.xyz/2021/04/marda-dd/test#helloWorld>
+Work in Progress.
+
+Tiny demo at <https://ns.polyneme.xyz/2021/04/marda-dd/test#helloWorld>
 
 # Development
 
