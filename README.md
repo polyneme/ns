@@ -1,2 +1,1 @@
-# ns
-ns.polyneme.xyz
+work in progress
