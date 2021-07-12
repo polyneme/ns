@@ -2,8 +2,8 @@ import os
 from typing import Optional, Union
 from pathlib import Path
 
-from fastapi import FastAPI, Response, Header
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, Response, Header
+from fastapi.responses import HTMLResponse, RedirectResponse
 import rdflib
 
 app = FastAPI()
@@ -70,17 +70,16 @@ def sorted_media_types(accept: str) -> bool:
     return [a[0] for a in alternatives]
 
 
-@app.get("/2021/04/marda-dd/test")
-async def root(accept: Optional[str] = Header(None)):
+def response_for(g: rdflib.Graph, accept: str, ns_base: str):
     types_ = sorted_media_types(accept)
     for media_type in types_:
         if media_type == "text/html":
-            return HTMLResponse(content=render_html(TERMS), status_code=200)
+            return HTMLResponse(content=render_html(g), status_code=200)
         elif media_type == "application/ld+json":
-            TERMS.namespace_manager.bind("base", TEST_BASE)
+            g.namespace_manager.bind("base", ns_base)
             try:
                 return Response(
-                    content=TERMS.serialize(
+                    content=g.serialize(
                         encoding="utf-8", format=media_type,
                         auto_compact=True,
                     ).decode("utf-8"),
@@ -91,12 +90,41 @@ async def root(accept: Optional[str] = Header(None)):
         else:
             try:
                 return Response(
-                    content=TERMS.serialize(
-                        base=TEST_BASE, encoding="utf-8", format=media_type
+                    content=g.serialize(
+                        base=ns_base, encoding="utf-8", format=media_type
                     ).decode("utf-8"),
                     media_type=media_type,
                 )
             except rdflib.plugin.PluginException:
                 continue
     else:
-        return HTMLResponse(content=render_html(TERMS), status_code=200)
+        return HTMLResponse(content=render_html(g), status_code=200)
+
+
+@app.get("/2021/04/marda-dd/test")
+async def root(accept: Optional[str] = Header(None)):
+    return response_for(TERMS, accept, TEST_BASE)
+
+
+@app.get("/ark:/57802/{rest_of_path:path}", response_class=RedirectResponse)
+async def _ark(request: Request):
+    return RedirectResponse(url=str(request.url).replace("ark:/", "ark:"), status_code=301)
+
+
+@app.get("/ark:57802/{rest_of_path:path}")
+async def ark(rest_of_path, request: Request, accept: Optional[str] = Header(None)):
+    parts = rest_of_path.split("/")
+    basename = parts[0]
+    leaf_and_variants = parts[-1].split(".")
+    leaf, variants = leaf_and_variants[0], leaf_and_variants[1:]
+    subparts = (parts[1:-1] + [leaf]) if len(parts) > 1 else []
+
+    return {
+        "resolver": str(request.base_url),
+        "nma": str(request.base_url).split("/")[-2],
+        "naan": "57802",
+        "basename": basename,
+        "subparts": subparts,
+        "variants": variants
+    }
+
