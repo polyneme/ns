@@ -100,7 +100,7 @@ def add_ark_map_entry(url: str, id_desired: str = None, naan: str = "57802"):
         else:
             id_to_use = id_desired
     else:
-        id_to_use = generate_id_unique(naan)
+        id_to_use = generate_id_unique(naan).replace("-", "")
     if not isinstance(id_to_use, str):
         raise Exception("internal error: add_ark_map_entry")
     with open(ARK_MAP_PATH, "a") as f:

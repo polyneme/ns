@@ -124,7 +124,7 @@ async def _ark(request: Request):
 @app.get("/ark:57802/{rest_of_path:path}")
 async def ark(rest_of_path, request: Request, accept: Optional[str] = Header(None)):
     parts = rest_of_path.split("/")
-    basename = parts[0]
+    basename = parts[0].replace("-", "")
     leaf_and_variants = parts[-1].split(".")
     leaf, variants = leaf_and_variants[0], leaf_and_variants[1:]
     subparts = (parts[1:-1] + [leaf]) if len(parts) > 1 else []
