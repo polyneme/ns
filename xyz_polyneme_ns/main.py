@@ -130,7 +130,7 @@ async def ark(rest_of_path, request: Request, accept: Optional[str] = Header(Non
     subparts = (parts[1:-1] + [leaf]) if len(parts) > 1 else []
 
     ark_map_url = ark_map(naan="57802").get(f"ark:57802/{basename}")
-    # TODO support ?info inflection via {who,what,when,where,how} columns in ark_map.csv
+    # TODO support ?info inflection via {who,what,when,how} columns in ark_map.csv
     #   See: https://n2t.net/e/n2t_apidoc.html#identifier-metadata
     if ark_map_url:
         return RedirectResponse(url=ark_map_url, status_code=303)

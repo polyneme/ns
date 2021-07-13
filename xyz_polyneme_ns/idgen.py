@@ -1,12 +1,18 @@
 import csv
 import os
+from collections import defaultdict
 from functools import lru_cache
 import re
 
 import base32_lib as base32
+from pydantic import HttpUrl, ValidationError, BaseModel, constr
 
 ARK_MAP_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ark_map.csv"
+)
+ARK_NAAN_SHOULDER_MAP_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "ark_naan_shoulder_map.csv",
 )
 
 
@@ -71,7 +77,17 @@ def ark_map(naan: str = "57802"):
         }
 
 
-ark_basename = re.compile(f"ark:[^\/]+/([^\/]+)")
+@lru_cache
+def ark_naan_shoulder_map():
+    with open(ARK_NAAN_SHOULDER_MAP_PATH) as csvfile:
+        reader = csv.DictReader(csvfile)
+        naan_shoulders = defaultdict(set)
+        for row in reader:
+            naan_shoulders[row["naan"]].add(row["shoulder"])
+        return naan_shoulders
+
+
+ark_basename = re.compile(rf"ark:[^/]+/([^/]+)")
 
 
 @lru_cache
@@ -79,7 +95,9 @@ def existing_basenames(naan: str = "57802"):
     return {ark.split("/")[1].split(".", maxsplit=1)[0] for ark in ark_map(naan)}
 
 
-def generate_id_unique(naan: str = "57802", **generate_id_kwargs) -> str:
+def generate_id_unique(
+    naan: str = "57802", shoulder: str = "fk1", **generate_id_kwargs
+) -> str:
     """Generate unique Crockford Base32-encoded ID for ARK naan basename.
 
     Use local ark_map to check uniqueness under naan.
@@ -88,22 +106,55 @@ def generate_id_unique(naan: str = "57802", **generate_id_kwargs) -> str:
     get_one = True
     collection = existing_basenames(naan)
     while get_one:
-        eid = generate_id(**generate_id_kwargs)
+        eid = shoulder + generate_id(**generate_id_kwargs)
         get_one = eid in collection
     return eid
 
 
-def add_ark_map_entry(url: str, id_desired: str = None, naan: str = "57802"):
+Ark = constr(regex=r"^ark:[^/]+/.+$")
+
+
+class ArkMapEntry(BaseModel):
+    ark: Ark
+    url: HttpUrl
+
+
+def add_ark_map_entry(
+    url: str,
+    id_desired: str = None,
+    shoulder: str = "fk1",
+    naan: str = "57802",
+):
     if id_desired is not None:
         if id_desired in existing_basenames(naan):
             raise ValueError(f"id_desired already has ark map entry under ark:{naan}/.")
         else:
             id_to_use = id_desired
     else:
-        id_to_use = generate_id_unique(naan).replace("-", "")
+        # length 8 minus 2-digit checksum => (2**5)**6 ~ 1 billion blades for each shoulder.
+        id_to_use = generate_id_unique(
+            naan=naan, shoulder=shoulder, length=8, split_every=0, checksum=True
+        )
     if not isinstance(id_to_use, str):
         raise Exception("internal error: add_ark_map_entry")
+
+    shoulders = ark_naan_shoulder_map()[naan]
+    for s in shoulders:
+        if id_to_use.startswith(s):
+            break
+    else:  # id_to_use does not start with a registered should for this naan
+        raise ValueError(
+            f"ID {id_to_use} does not start with a registered shoulder for naan {naan} "
+            f"(must be one of {shoulders})."
+        )
+
+    ark_new = f"ark:{naan}/{id_to_use}"
+    try:
+        ArkMapEntry(ark=ark_new, url=url)
+    except ValidationError as e:
+        raise ValueError(f"bad ark map entry: {e}")
+
     with open(ARK_MAP_PATH, "a") as f:
         f.write(f"ark:{naan}/{id_to_use},{url}\n")
     ark_map.cache_clear()
-    return ark_map(naan)[f"ark:{naan}/{id_to_use}"]
+    return ark_new, ark_map(naan)[ark_new]

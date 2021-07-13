@@ -12,10 +12,11 @@ make init
 # or `make update` if you'd also like to update dependencies to latest permissible versions.
 ```
 
-Initialize/supply an [ARK](https://arks.org/) map.
+Initialize/supply [ARK](https://arks.org/) maps.
 ```shell
 # This is sufficient to get started.
 cp ark_map.example.csv ark_map.csv
+cp ark_shoulder_map.example.csv ark_shoulder_map.csv
 ```
 
 You can then run the server with:
