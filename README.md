@@ -4,16 +4,18 @@ Tiny demo at <https://ns.polyneme.xyz/2021/04/marda-dd/test#helloWorld>
 
 # Development
 
-To run the server locally, (optionally) create a new Python virtualenv of your preferred flavor and install the dependencies.
+To run the server locally, (optionally) create a new Python virtualenv of your preferred flavor and
+install the dependencies.
 
 ```shell
-pip install -r requirements
+make init
+# or `make update` if you'd also like to update dependencies to latest permissible versions.
 ```
 
 You can then run the server with:
 
 ```shell
-uvicorn --reload --port=8000 main:app
+make up-dev
 ```
 
 ## Example queries:

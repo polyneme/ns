@@ -1,3 +1,4 @@
+base32_lib
 fastapi[all]
 gunicorn
 rdflib~=5.0

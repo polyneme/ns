@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request, Response, Header
 from fastapi.responses import HTMLResponse, RedirectResponse
 import rdflib
 
+from xyz_polyneme_ns.idgen import ark_map
+
 app = FastAPI()
 
 TEST_BASE = "http://ns.polyneme.xyz/2021/04/marda-dd/test#"
@@ -17,7 +19,12 @@ def load_ttl(filename: Union[Path, str]) -> rdflib.Graph:
     return g
 
 
-TERMS = load_ttl(os.path.join(os.path.dirname(__file__), "hello_world.ttl"))
+TERMS = load_ttl(
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "hello_world.ttl",
+    )
+)
 
 
 def render_html(g: rdflib.Graph) -> str:
@@ -80,7 +87,8 @@ def response_for(g: rdflib.Graph, accept: str, ns_base: str):
             try:
                 return Response(
                     content=g.serialize(
-                        encoding="utf-8", format=media_type,
+                        encoding="utf-8",
+                        format=media_type,
                         auto_compact=True,
                     ).decode("utf-8"),
                     media_type=media_type,
@@ -108,7 +116,9 @@ async def root(accept: Optional[str] = Header(None)):
 
 @app.get("/ark:/57802/{rest_of_path:path}", response_class=RedirectResponse)
 async def _ark(request: Request):
-    return RedirectResponse(url=str(request.url).replace("ark:/", "ark:"), status_code=301)
+    return RedirectResponse(
+        url=str(request.url).replace("ark:/", "ark:"), status_code=301
+    )
 
 
 @app.get("/ark:57802/{rest_of_path:path}")
@@ -119,12 +129,17 @@ async def ark(rest_of_path, request: Request, accept: Optional[str] = Header(Non
     leaf, variants = leaf_and_variants[0], leaf_and_variants[1:]
     subparts = (parts[1:-1] + [leaf]) if len(parts) > 1 else []
 
-    return {
-        "resolver": str(request.base_url),
-        "nma": str(request.base_url).split("/")[-2],
-        "naan": "57802",
-        "basename": basename,
-        "subparts": subparts,
-        "variants": variants
-    }
-
+    ark_map_url = ark_map(naan="57802").get(f"ark:57802/{basename}")
+    # TODO support ?info inflection via {who,what,when,where,how} columns in ark_map.csv
+    #   See: https://n2t.net/e/n2t_apidoc.html#identifier-metadata
+    if ark_map_url:
+        return RedirectResponse(url=ark_map_url, status_code=303)
+    else:
+        return {
+            "resolver": str(request.base_url),
+            "nma": str(request.base_url).split("/")[-2],
+            "naan": "57802",
+            "basename": basename,
+            "subparts": subparts,
+            "variants": variants,
+        }
