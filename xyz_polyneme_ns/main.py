@@ -157,7 +157,7 @@ async def root(accept: Optional[str] = Header(None)):
     )
 
 
-@app.get("/ark:57802/2021/08/marda-phonons")
+@app.get("/ark:57802/2021/08/mardaphonons")
 async def marda_phonons(accept: Optional[str] = Header(None)):
     return response_for(
         g=load_ttl(
