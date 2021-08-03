@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response, Header
 from fastapi.responses import HTMLResponse, RedirectResponse
 import rdflib
+from rdflib import namespace
 
 from xyz_polyneme_ns.idgen import ark_map
 
@@ -27,7 +28,7 @@ TERMS = load_ttl(
 )
 
 
-def render_html(g: rdflib.Graph) -> str:
+def render_html(g: rdflib.Graph, ns_base=TEST_BASE) -> str:
     header = """<html>
   <style type="text/css">
     dt { font-weight: bold; text-decoration: underline dotted; }
@@ -46,12 +47,43 @@ def render_html(g: rdflib.Graph) -> str:
         if subject in _parsed_subjects:
             continue
         _parsed_subjects.add(subject)
-        term = subject.split(TEST_BASE)[-1]
+        term = subject.split(ns_base)[-1]
         label = g.label(subject)
         comment = g.comment(subject)
 
         dt = f"""      <dt id="#{term}">{label}</dt>
       <dd>{comment}</dd>"""
+        dl += dt
+
+    return header + dl + footer
+
+
+def render_html_skos(g: rdflib.Graph, ns_base=TEST_BASE) -> str:
+    header = """<html>
+  <style type="text/css">
+    dt { font-weight: bold; text-decoration: underline dotted; }
+  </style>
+  <body>
+    <dl>
+"""
+    footer = """
+    </dl>
+  </body>
+</html>"""
+
+    dl = ""
+    _parsed_subjects = set()
+    for subject in sorted(g.subjects()):
+        if subject in _parsed_subjects:
+            continue
+        _parsed_subjects.add(subject)
+        term = subject.split(ns_base)[-1]
+        label = g.value(subject, namespace.SKOS.prefLabel)
+        definition = g.value(subject, namespace.SKOS.definition)
+        if label is None or definition is None:
+            continue
+        dt = f"""      <dt id="#{term}">{label}</dt>
+      <dd>{definition}</dd>"""
         dl += dt
 
     return header + dl + footer
@@ -77,11 +109,18 @@ def sorted_media_types(accept: str) -> bool:
     return [a[0] for a in alternatives]
 
 
-def response_for(g: rdflib.Graph, accept: str, ns_base: str):
+def response_for(g: rdflib.Graph, accept: str, ns_base: str, html_profile=None):
     types_ = sorted_media_types(accept)
     for media_type in types_:
         if media_type == "text/html":
-            return HTMLResponse(content=render_html(g), status_code=200)
+            if html_profile == "SKOS":
+                return HTMLResponse(
+                    content=render_html_skos(g, ns_base=ns_base), status_code=200
+                )
+            else:
+                return HTMLResponse(
+                    content=render_html(g, ns_base=ns_base), status_code=200
+                )
         elif media_type == "application/ld+json":
             g.namespace_manager.bind("base", ns_base)
             try:
@@ -111,7 +150,23 @@ def response_for(g: rdflib.Graph, accept: str, ns_base: str):
 
 @app.get("/2021/04/marda-dd/test")
 async def root(accept: Optional[str] = Header(None)):
-    return response_for(TERMS, accept, TEST_BASE)
+    return response_for(
+        TERMS,
+        accept,
+        TEST_BASE,
+    )
+
+
+@app.get("/ark:57802/2021/08/marda-phonons")
+async def marda_phonons(accept: Optional[str] = Header(None)):
+    return response_for(
+        g=load_ttl(
+            "https://raw.githubusercontent.com/marda-dd/phonons/main/concept_scheme.ttl"
+        ),
+        accept=accept,
+        ns_base="https://n2t.net/ark:57802/2021/08/marda-phonons/",
+        html_profile="SKOS",
+    )
 
 
 @app.get("/ark:/57802/{rest_of_path:path}", response_class=RedirectResponse)
