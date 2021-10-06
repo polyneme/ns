@@ -111,7 +111,7 @@ def into_rdflib_graph(
             (
                 URIRef(f"{API_HOST}/{term_namespace}/{subject}"),
                 URIRef("rdfs:isDefinedBy"),
-                URIRef(term_namespace),
+                URIRef(f"{API_HOST}/{term_namespace}"),
             )
         )
     else:
