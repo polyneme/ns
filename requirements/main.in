@@ -1,6 +1,9 @@
 base32_lib
 fastapi[all]
 gunicorn
+passlib[bcrypt]
 pydantic
-rdflib~=5.0
-rdflib-jsonld>=0.5.0
+pymongo
+python-jose[cryptography]
+rdflib>=6.0.1  # includes rdflib-jsonld functionality
+toolz

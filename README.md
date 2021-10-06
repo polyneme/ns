@@ -16,7 +16,7 @@ Initialize/supply [ARK](https://arks.org/) maps.
 ```shell
 # This is sufficient to get started.
 cp ark_map.example.csv ark_map.csv
-cp ark_shoulder_map.example.csv ark_shoulder_map.csv
+cp ark_naan_shoulder_map.example.csv ark_naan_shoulder_map.csv
 ```
 
 You can then run the server with:

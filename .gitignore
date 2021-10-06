@@ -133,3 +133,8 @@ dmypy.json
 
 ark_map.csv
 ark_naan_shoulder_map.csv
+
+# CA Certificate to connect to MongoDB
+ca-certificate.crt
+
+repl.ipynb

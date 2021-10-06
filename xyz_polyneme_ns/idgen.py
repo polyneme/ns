@@ -6,14 +6,7 @@ import re
 
 import base32_lib as base32
 from pydantic import HttpUrl, ValidationError, BaseModel, constr
-
-ARK_MAP_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ark_map.csv"
-)
-ARK_NAAN_SHOULDER_MAP_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "ark_naan_shoulder_map.csv",
-)
+from pymongo.database import Database as MongoDatabase
 
 
 def generate_id(length=10, split_every=4, checksum=True) -> str:
@@ -67,24 +60,15 @@ def encode_id(number: int, split_every=4, min_length=10, checksum=True) -> int:
 
 
 @lru_cache
-def ark_map(naan: str = "57802"):
-    with open(ARK_MAP_PATH) as csvfile:
-        reader = csv.DictReader(csvfile)
-        return {
-            row["ark"]: row["url"]
-            for row in reader
-            if row["ark"].startswith(f"ark:{naan}")
-        }
+def ark_map(mdb: MongoDatabase, naan: str = "57802"):
+    return {
+        d["_id"]: d["_t"] for d in mdb.arks.find({"_id": {"$regex": rf"^ark:{naan}"}})
+    }
 
 
 @lru_cache
-def ark_naan_shoulder_map():
-    with open(ARK_NAAN_SHOULDER_MAP_PATH) as csvfile:
-        reader = csv.DictReader(csvfile)
-        naan_shoulders = defaultdict(set)
-        for row in reader:
-            naan_shoulders[row["naan"]].add(row["shoulder"])
-        return naan_shoulders
+def ark_naan_shoulder_map(mdb: MongoDatabase):
+    return {d["_id"]: set(d["shoulders"]) for d in mdb.naans.find({}, ["shoulders"])}
 
 
 ark_basename = re.compile(rf"ark:[^/]+/([^/]+)")
