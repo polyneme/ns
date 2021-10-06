@@ -336,6 +336,7 @@ async def get_vocabulary_term(
     repo: str,
     term: str,
     mdb: MongoDatabase = Depends(mongo_db),
+    accept: Optional[str] = Header(None),
 ):
     """
 
@@ -346,11 +347,21 @@ async def get_vocabulary_term(
     check_too_early(year, month)
 
     term_namespace = f"ark:{naan}/{year}/{month:02d}/{org}/{repo}"
-    return raise404_if_none(
+    term_doc = raise404_if_none(
         mdb.terms.find_one(
             {"_aliases": {"$elemMatch": {"ns": term_namespace, "local": term}}}
         )
     )
+
+    docs = []
+    for d in [term_doc]:
+        subject = next(
+            alias["local"] for alias in d["_aliases"] if alias["ns"] == term_namespace
+        )
+        predicate_objects = dissoc(d, "_id", "_aliases")
+        docs.append((subject, predicate_objects))
+    g = into_rdflib_graph(docs=docs, term_namespace=term_namespace, single_term=True)
+    return response_for(g, accept, ns_base=term_namespace)
 
 
 @app.get(
