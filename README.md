@@ -10,6 +10,12 @@ install the dependencies.
 ```shell
 make init
 # or `make update` if you'd also like to update dependencies to latest permissible versions.
+#
+# For now, install pyLODE separately (2.12.0 does not work with rdflib>6.0.0):
+# git clone git@github.com:polyneme/pyLODE.git && cd pyLODE
+# git checkout serialize-jsonld
+# pip install -r requirements.server.txt
+# pip install -e .
 ```
 
 Initialize/supply [ARK](https://arks.org/) maps.
@@ -22,6 +28,7 @@ cp ark_naan_shoulder_map.example.csv ark_naan_shoulder_map.csv
 You can then run the server with:
 
 ```shell
+export $(grep -v '^#' .env | xargs)
 make up-dev
 ```
 

@@ -19,6 +19,7 @@ from fastapi import FastAPI, Request, Response, Header, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 import rdflib
 from rdflib import URIRef, Literal
+import pylode
 from pymongo import ReplaceOne, UpdateOne
 from pymongo.database import Database as MongoDatabase
 from rdflib import namespace as rdf_ns
@@ -94,8 +95,11 @@ def into_rdflib_graph(
     g.namespace_manager.bind("rdf", rdf_ns.RDF)
     g.namespace_manager.bind("rdfs", rdf_ns.RDFS)
     g.namespace_manager.bind("owl", rdf_ns.OWL)
+    g.namespace_manager.bind("base", f"{API_HOST}/{term_namespace}/")
 
     for subject, predicate_objects in docs:
+        # TODO inject @context into predicate_objects and
+        #      parse into g (or expand using pyld?). set @id as subject?
         for p, o in predicate_objects.items():
             g.add(
                 (
@@ -110,7 +114,7 @@ def into_rdflib_graph(
         g.add(
             (
                 URIRef(f"{API_HOST}/{term_namespace}/{subject}"),
-                URIRef("rdfs:isDefinedBy"),
+                URIRef(rdf_ns.RDFS.isDefinedBy),
                 URIRef(f"{API_HOST}/{term_namespace}"),
             )
         )
@@ -118,8 +122,8 @@ def into_rdflib_graph(
         g.add(
             (
                 URIRef(f"{API_HOST}/{term_namespace}"),
-                URIRef("rdf:type"),
-                URIRef("owl:Ontology"),
+                URIRef(rdf_ns.RDF.type),
+                URIRef(rdf_ns.OWL.Ontology),
             )
         )
 
@@ -135,64 +139,8 @@ TERMS = load_ttl(
 
 
 def render_html(g: rdflib.Graph, ns_base=TEST_BASE) -> str:
-    header = """<html>
-  <style type="text/css">
-    dt { font-weight: bold; text-decoration: underline dotted; }
-  </style>
-  <body>
-    <dl>
-"""
-    footer = """
-    </dl>
-  </body>
-</html>"""
-
-    dl = ""
-    _parsed_subjects = set()
-    for subject in g.subjects():
-        if subject in _parsed_subjects:
-            continue
-        _parsed_subjects.add(subject)
-        term = subject  # .split(ns_base)[-1]
-        label = g.label(subject)
-        comment = g.comment(subject)
-
-        dt = f"""      <dt id="#{term}">{label}</dt>
-      <dd>{comment}</dd>"""
-        dl += dt
-
-    return header + dl + footer
-
-
-def render_html_skos(g: rdflib.Graph, ns_base=TEST_BASE) -> str:
-    header = """<html>
-  <style type="text/css">
-    dt { font-weight: bold; text-decoration: underline dotted; }
-  </style>
-  <body>
-    <dl>
-"""
-    footer = """
-    </dl>
-  </body>
-</html>"""
-
-    dl = ""
-    _parsed_subjects = set()
-    for subject in sorted(g.subjects()):
-        if subject in _parsed_subjects:
-            continue
-        _parsed_subjects.add(subject)
-        term = subject.split(ns_base)[-1]
-        label = g.value(subject, rdf_ns.SKOS.prefLabel)
-        definition = g.value(subject, rdf_ns.SKOS.definition)
-        if label is None or definition is None:
-            continue
-        dt = f"""      <dt id="#{term}">{label}</dt>
-      <dd>{definition}</dd>"""
-        dl += dt
-
-    return header + dl + footer
+    html = pylode.MakeDocco(data=g, outputformat="html", profile="ontdoc").document()
+    return html
 
 
 def sorted_media_types(accept: str) -> List[str]:
@@ -219,49 +167,44 @@ def sorted_media_types(accept: str) -> List[str]:
 
 def response_for(g: rdflib.Graph, accept: str, ns_base: str, html_profile=None):
     types_ = sorted_media_types(accept)
-    # for media_type in types_:
-    #     if media_type == "text/html":
-    #         if html_profile == "None":
-    #             return HTMLResponse(
-    #                 content=render_html(g, ns_base=ns_base), status_code=200
-    #             )
-    #     elif media_type == "application/ld+json":
-    #         g.namespace_manager.bind("base", ns_base)
-    #         try:
-    #             return Response(
-    #                 content=g.serialize(
-    #                     encoding="utf-8",
-    #                     format=media_type,
-    #                     auto_compact=True,
-    #                 ).decode("utf-8"),
-    #                 media_type=media_type,
-    #             )
-    #         except rdflib.plugin.PluginException:
-    #             continue
-    #     else:
-    #         try:
-    #             return Response(
-    #                 content=g.serialize(
-    #                     base=ns_base, encoding="utf-8", format=media_type
-    #                 ).decode("utf-8"),
-    #                 media_type=media_type,
-    #             )
-    #         except rdflib.plugin.PluginException:
-    #             continue
-    # else:
-    #     return HTMLResponse(content=render_html(g), status_code=200)
-    return Response(
-        content=g.serialize(
-            encoding="utf-8",
-            format="application/ld+json",
-            auto_compact=True,
-        ).decode("utf-8"),
-        media_type="application/json",
-    )
+    for media_type in types_:
+        if media_type == "text/html":
+            if html_profile == "None":
+                return HTMLResponse(
+                    content=render_html(g, ns_base=ns_base), status_code=200
+                )
+        elif media_type == "application/ld+json":
+            g.namespace_manager.bind("base", ns_base)
+            try:
+                return Response(
+                    content=g.serialize(
+                        encoding="utf-8",
+                        format=media_type,
+                        auto_compact=True,
+                    ).decode("utf-8"),
+                    media_type=media_type,
+                )
+            except rdflib.plugin.PluginException:
+                continue
+        else:
+            try:
+                return Response(
+                    content=g.serialize(
+                        base=ns_base, encoding="utf-8", format=media_type
+                    ).decode("utf-8"),
+                    media_type=media_type,
+                )
+            except rdflib.plugin.PluginException:
+                continue
+    else:
+        return HTMLResponse(content=render_html(g), status_code=200)
 
 
 @app.get(
-    "/ark:/{naan}/{rest_of_path:path}", response_class=RedirectResponse, tags=["util"]
+    "/ark:/{naan}/{rest_of_path:path}",
+    response_class=RedirectResponse,
+    tags=["util"],
+    summary="Get ARK (Slash Before NAAN)",
 )
 async def _ark(naan: int, request: Request):
     """normalize request to not have slash (/) preceding ark naan."""
@@ -368,6 +311,7 @@ async def get_vocabulary_term(
     "/ark:{naan}/{year}/{month}/{org}/{repo}/",
     response_model=List[VocabularyTerm],
     tags=["util"],
+    summary="List Vocabulary Terms (Trailing Slash)",
 )
 async def _list_vocabulary_terms(
     naan: int,
@@ -417,6 +361,8 @@ async def list_vocabulary_terms(
         docs=docs,
         term_namespace=term_namespace,
     )
+    print("PRINTING GRAPH")
+    print(g.serialize(format="turtle"))
     return response_for(g, accept, ns_base=term_namespace)
 
 
@@ -583,7 +529,11 @@ async def update_vocabulary_terms(
     return list(mdb.terms.find({"_id": {"$in": term_doc_ids}}))
 
 
-@app.get("/ark:{naan}/{rest_of_path:path}", tags=["util"])
+@app.get(
+    "/ark:{naan}/{rest_of_path:path}",
+    tags=["util"],
+    summary="Get ARK (Arbitrary ID Pattern)",
+)
 async def ark(
     naan: int,
     rest_of_path,
