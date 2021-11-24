@@ -7,3 +7,4 @@ pymongo
 python-jose[cryptography]
 rdflib>=6.0.1  # includes rdflib-jsonld functionality
 toolz
+typer[all]

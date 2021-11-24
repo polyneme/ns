@@ -30,4 +30,9 @@ setuptools.setup(
         "dev": dev_requires,
     },
     python_requires=">=3.8",
+    entry_points={
+        "console_scripts": [
+            "termeric = xyz_polyneme_ns.cli:app",
+        ]
+    },
 )
