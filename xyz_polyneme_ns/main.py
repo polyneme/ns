@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import json
 import pylode
 
@@ -13,12 +15,12 @@ from pymongo.results import DeleteResult
 from starlette import status
 from starlette.responses import PlainTextResponse
 from toolz import dissoc, assoc, merge
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from fastapi import FastAPI, Request, Response, Header, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 import rdflib
-from rdflib import Graph
+from rdflib import Graph, RDF, OWL, SKOS
 from pymongo import ReplaceOne
 from pymongo.database import Database as MongoDatabase
 
@@ -49,6 +51,10 @@ tags_metadata = [
     },
     {"name": "agents", "description": "do stuff using credentials"},
     {"name": "util", "description": "redirects, catch-alls, etc."},
+    {
+        "name": "legacy",
+        "description": "stuff that was here before, with URLs I don't want to break",
+    },
 ]
 
 app = FastAPI(
@@ -99,10 +105,8 @@ def sorted_media_types(accept: str) -> List[str]:
 def response_for(g: rdflib.Graph, accept: str):
     types_ = sorted_media_types(accept)
     for media_type in types_:
-        if media_type == "text/html":
-            html = pylode.MakeDocco(
-                data=g, outputformat="html", profile="ontdoc"
-            ).document()
+        if media_type == "text/html" and pylode_able(g):
+            html = pylode.OntDoc(g).make_html()
             return HTMLResponse(content=html)
         else:
             try:
@@ -187,11 +191,47 @@ def unset_term_equivalences():
     return {"$unset": {"owl:equivalentProperty": "", "owl:equivalentClass": ""}}
 
 
+def load_graph_from_file(filename: Union[Path, str], format_=None) -> rdflib.Graph:
+    g = rdflib.Graph()
+    g.parse(str(filename), format=format_)
+    return g
+
+
 def jsonld_doc_response(jsonld_doc, accept):
     jsonld_doc = dissoc(jsonld_doc, "_id")
     g = Graph()
     g.parse(data=json.dumps(jsonld_doc), format="json-ld")
     return response_for(g, accept)
+
+
+def pylode_able(g: rdflib.Graph) -> bool:
+    return g.value(predicate=RDF.type, object=OWL.Ontology) or g.value(
+        predicate=RDF.type, object=SKOS.ConceptScheme
+    )
+
+
+@app.get("/2021/04/marda-dd/test", summary="MaRDA DD Test", tags=["legacy"])
+async def marda_dd_test(accept: Optional[str] = Header(None)):
+    return response_for(
+        g=load_graph_from_file(
+            "https://raw.githubusercontent.com/polyneme/ns/main/hello_world.ttl",
+            format_="turtle",
+        ),
+        accept=accept,
+    )
+
+
+@app.get("/ark:57802/2021/08/mardaphonons", summary="MaRDA Phonons", tags=["legacy"])
+async def marda_phonons(accept: Optional[str] = Header(None)):
+    # XXX important that this route is registered *before*
+    #     the more general "/ark:{naan}/{rest_of_path:path}" route.
+    return response_for(
+        g=load_graph_from_file(
+            "https://raw.githubusercontent.com/marda-dd/phonons/main/concept_scheme.ttl",
+            format_="turtle",
+        ),
+        accept=accept,
+    )
 
 
 @app.post(

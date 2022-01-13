@@ -3,6 +3,7 @@ fastapi[all]
 gunicorn
 passlib[bcrypt]
 pydantic
+pyLODE
 pymongo
 python-jose[cryptography]
 rdflib>=6.0.1  # includes rdflib-jsonld functionality
