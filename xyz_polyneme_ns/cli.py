@@ -1,3 +1,6 @@
+from toolz import merge
+from typing import Optional
+
 import json
 
 import os
@@ -5,25 +8,31 @@ import os
 from requests import request
 import typer
 
-app = typer.Typer()
+from xyz_polyneme_ns.models import ArkNaan, ArkShoulder
+from xyz_polyneme_ns.util import HOST, NAAN, USER, PASS, ACCEPT
 
-HOST = os.environ.get("API_HOST")
-NAAN = os.environ.get("API_AGENT_NAAN")
-USER = os.environ.get("API_AGENT_USERNAME")
-PASS = os.environ.get("API_AGENT_PASSWORD")
+app = typer.Typer()
 
 
 def req(method, path, **kwargs):
     url = f"{HOST}/ark:{NAAN}{path}"
+    headers = merge({"Accept": ACCEPT}, kwargs.get("headers", {}))
+    kwargs.pop("headers", None)
     return request(
         method,
         url,
         auth=(USER, PASS),
-        headers={
-            "Accept": "application/ld+json,text/turtle;q=0.9,application/rdf+xml;q=0.8,*/*;q=0.5"
-        },
+        headers=headers,
         **kwargs,
     )
+
+
+@app.command()
+def get(path: str, accept: Optional[str] = ACCEPT):
+    _path = path[1:] if path.startswith("/") else path
+    url = f"{HOST}/{_path}"
+    rv = request("GET", url, headers={"Accept": accept})
+    typer.echo(rv.content)
 
 
 @app.command()
@@ -53,6 +62,26 @@ def get_term(path: str):
 @app.command()
 def create_term(path: str, term: str, term_in: str):
     rv = req("POST", path, params={"term": term}, json=json.loads(term_in))
+    typer.echo(rv.content)
+
+
+@app.command()
+def create_individual(shoulder: str, individual_in: str):
+    rv = req("POST", f"/{shoulder}", json=json.loads(individual_in))
+    typer.echo(rv.content)
+
+
+@app.command()
+def get_individual(assigned_base_name: str, accept: Optional[str] = ACCEPT):
+    rv = req("GET", f"/{assigned_base_name}", headers={"Accept": accept})
+    typer.echo(rv.content)
+
+
+@app.command()
+def update_individual(assigned_base_name: str, individual_in: str):
+    rv = req(
+        "PATCH", f"/{assigned_base_name}", json={"update": json.loads(individual_in)}
+    )
     typer.echo(rv.content)
 
 

@@ -60,9 +60,10 @@ def encode_id(number: int, split_every=4, min_length=10, checksum=True) -> int:
 
 
 @lru_cache
-def ark_map(mdb: MongoDatabase, naan: str = "57802"):
+def ark_map(mdb: MongoDatabase, naan: int = 57802):
     return {
-        d["_id"]: d["_t"] for d in mdb.arks.find({"_id": {"$regex": rf"^ark:{naan}"}})
+        d["_id"]: d.get("_t")
+        for d in mdb.arks.find({"_id": {"$regex": rf"^ark:{naan}"}}, ["_t"])
     }
 
 
@@ -75,70 +76,37 @@ ark_basename = re.compile(rf"ark:[^/]+/([^/]+)")
 
 
 @lru_cache
-def existing_basenames(naan: str = "57802"):
-    return {ark.split("/")[1].split(".", maxsplit=1)[0] for ark in ark_map(naan)}
+def existing_basenames(mdb: MongoDatabase, naan: int = 57802):
+    return {ark.split("/")[1].split(".", maxsplit=1)[0] for ark in ark_map(mdb, naan)}
 
 
-def generate_id_unique(
-    naan: str = "57802", shoulder: str = "fk1", **generate_id_kwargs
-) -> str:
-    """Generate unique Crockford Base32-encoded ID for ARK naan basename.
-
-    Use local ark_map to check uniqueness under naan.
-
-    """
-    get_one = True
-    collection = existing_basenames(naan)
-    while get_one:
-        eid = shoulder + generate_id(**generate_id_kwargs)
-        get_one = eid in collection
-    return eid
+# sping: "semi-opaque string" (https://n2t.net/e/n2t_apidoc.html).
+SPING_SIZE_THRESHOLDS = [(n, (2 ** (5 * n)) // 2) for n in [2, 4, 6, 8, 10]]
 
 
-Ark = constr(regex=r"^ark:[^/]+/.+$")
-
-
-class ArkMapEntry(BaseModel):
-    ark: Ark
-    url: HttpUrl
-
-
-def add_ark_map_entry(
-    url: str,
-    id_desired: str = None,
+def create_ark_bon(
+    mdb: MongoDatabase,
+    naan: int = 57802,
     shoulder: str = "fk1",
-    naan: str = "57802",
-):
-    if id_desired is not None:
-        if id_desired in existing_basenames(naan):
-            raise ValueError(f"id_desired already has ark map entry under ark:{naan}/.")
-        else:
-            id_to_use = id_desired
-    else:
-        # length 8 minus 2-digit checksum => (2**5)**6 ~ 1 billion blades for each shoulder.
-        id_to_use = generate_id_unique(
-            naan=naan, shoulder=shoulder, length=8, split_every=0, checksum=True
-        )
-    if not isinstance(id_to_use, str):
-        raise Exception("internal error: add_ark_map_entry")
+) -> str:
+    """Create and persist a new ARK Base Object Name (BON) for ARK naan + shoulder.
 
-    shoulders = ark_naan_shoulder_map()[naan]
-    for s in shoulders:
-        if id_to_use.startswith(s):
+    Generates a unique, as-short-as-reasonable Crockford Base32-encoded ID.
+    """
+    ark_to_shoulder = f"ark:{naan}/{shoulder}"
+    existing_blades = {
+        a.split(ark_to_shoulder, maxsplit=1)[1]
+        for a in mdb.arks.distinct("_id", {"_id": {"$regex": rf"^{ark_to_shoulder}"}})
+    }
+    n_chars = next(
+        (n for n, t in SPING_SIZE_THRESHOLDS if (1 + len(existing_blades)) < t),
+        12,
+    )
+    while True:
+        blade = generate_id(length=(n_chars + 2), split_every=0, checksum=True)
+        bon = f"ark:{naan}/{shoulder}{blade}"
+        taken = mdb.arks.find_one({"_id": {"$regex": rf"^{bon}"}}, ["_id"]) is not None
+        if not taken:
+            mdb.arks.insert_one({"_id": bon})
             break
-    else:  # id_to_use does not start with a registered should for this naan
-        raise ValueError(
-            f"ID {id_to_use} does not start with a registered shoulder for naan {naan} "
-            f"(must be one of {shoulders})."
-        )
-
-    ark_new = f"ark:{naan}/{id_to_use}"
-    try:
-        ArkMapEntry(ark=ark_new, url=url)
-    except ValidationError as e:
-        raise ValueError(f"bad ark map entry: {e}")
-
-    with open(ARK_MAP_PATH, "a") as f:
-        f.write(f"ark:{naan}/{id_to_use},{url}\n")
-    ark_map.cache_clear()
-    return ark_new, ark_map(naan)[ark_new]
+    return bon

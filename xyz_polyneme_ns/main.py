@@ -26,7 +26,11 @@ from pymongo.database import Database as MongoDatabase
 
 from xyz_polyneme_ns.auth import get_current_agent, get_password_hash
 from xyz_polyneme_ns.db import mongo_db
-from xyz_polyneme_ns.idgen import ark_map
+from xyz_polyneme_ns.idgen import (
+    ark_map,
+    ark_naan_shoulder_map,
+    create_ark_bon,
+)
 from xyz_polyneme_ns.models import (
     Doc,
     TermImport,
@@ -35,6 +39,10 @@ from xyz_polyneme_ns.models import (
     AgentType,
     AgentIn,
     get_agent_uri,
+    ArkShoulder,
+    ArkNaan,
+    BASE32_LETTERS,
+    get_shoulder,
 )
 from xyz_polyneme_ns.util import (
     REPO_ROOT_DIR,
@@ -122,7 +130,7 @@ def response_for(g: rdflib.Graph, accept: str):
         return PlainTextResponse(content=g.serialize(format="turtle"), status_code=200)
 
 
-def check_naan(mdb: MongoDatabase, naan: int):
+def check_naan(mdb: MongoDatabase, naan: ArkNaan):
     if mdb.naans.find_one({"_id": naan}) is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -139,7 +147,7 @@ def check_too_late(year, month):
         )
 
 
-def check_can_update(agent: Agent, org: str, repo: str):
+def check_can_update_term(agent: Agent, org: str, repo: str):
     if not (
         any(item == org or item == f"{org}/{repo}" for item in agent.can_admin)
         or any(item == f"{org}/{repo}" for item in agent.can_edit)
@@ -147,6 +155,23 @@ def check_can_update(agent: Agent, org: str, repo: str):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Agent {agent.username} cannot update term in {org}/{repo}.",
+        )
+
+
+def check_can_update_individual(agent: Agent, shoulder: ArkShoulder):
+    if not any(item == shoulder for item in agent.can_admin_shoulders):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Agent {agent.username} cannot update individual with shoulder {shoulder}.",
+        )
+
+
+def check_shoulder_registered(mdb: MongoDatabase, naan: ArkNaan, shoulder: ArkShoulder):
+    shoulders = ark_naan_shoulder_map(mdb)[naan]
+    if shoulder not in shoulders:
+        raise ValueError(
+            f"Shoulder {shoulder} is not registered for naan {naan} "
+            f"(must be one of {shoulders})."
         )
 
 
@@ -187,8 +212,14 @@ def check_can_manage(requester: Agent, agent: Agent):
             )
 
 
-def unset_term_equivalences():
-    return {"$unset": {"owl:equivalentProperty": "", "owl:equivalentClass": ""}}
+def unset_equivalences():
+    return {
+        "$unset": {
+            "owl:equivalentProperty": "",
+            "owl:equivalentClass": "",
+            "owl:sameAs": "",
+        }
+    }
 
 
 def load_graph_from_file(filename: Union[Path, str], format_=None) -> rdflib.Graph:
@@ -239,7 +270,7 @@ async def marda_phonons(accept: Optional[str] = Header(None)):
     tags=["terms"],
 )
 async def import_term(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -252,7 +283,7 @@ async def import_term(
 ):
     check_naan(mdb, naan)
     check_too_late(year, month)
-    check_can_update(agent, org, repo)
+    check_can_update_term(agent, org, repo)
 
     term_tgt_uri = f"ark:{naan}/{year}/{month:02d}/{org}/{repo}/{term}"
     term_src_uri = term_import.term_uri
@@ -285,11 +316,76 @@ async def import_term(
 
 
 @app.post(
+    "/ark:{naan}/{shoulder}",
+    tags=["individuals"],
+)
+async def create_individual(
+    naan: ArkNaan,
+    shoulder: ArkShoulder,
+    individual_in: Doc,
+    mdb: MongoDatabase = Depends(mongo_db),
+    agent: Agent = Depends(get_current_agent),
+    accept: Optional[str] = Header(None),
+):
+    check_naan(mdb, naan)
+    check_can_update_individual(agent, shoulder)
+    check_shoulder_registered(mdb, naan, shoulder)
+
+    ark_new = create_ark_bon(mdb=mdb, naan=naan, shoulder=shoulder)
+    ark_doc = assoc(individual_in.dict(), "@id", f"{API_HOST}/{ark_new}")
+    mdb.arks.replace_one({"_id": ark_new}, ensure_context(ark_doc), upsert=False)
+    ark_doc = mdb.arks.find_one({"_id": ark_new})
+    ark_map.cache_clear()
+    return jsonld_doc_response(ark_doc, accept)
+
+
+@app.get(
+    "/ark:{naan}/{assigned_base_name}",
+    tags=["individuals"],
+)
+async def get_individual(
+    naan: ArkNaan,
+    assigned_base_name: str,
+    mdb: MongoDatabase = Depends(mongo_db),
+    accept: Optional[str] = Header(None),
+):
+    check_naan(mdb, naan)
+
+    indiv_uri = f"{API_HOST}/ark:{naan}/{assigned_base_name}"
+    indiv_doc = raise404_if_none(mdb.arks.find_one({"@id": indiv_uri}))
+
+    return jsonld_doc_response(indiv_doc, accept)
+
+
+@app.patch(
+    "/ark:{naan}/{assigned_base_name}",
+    tags=["individuals"],
+)
+async def update_individual(
+    naan: ArkNaan,
+    assigned_base_name: str,
+    indiv_update: DocUpdate,
+    mdb: MongoDatabase = Depends(mongo_db),
+    agent: Agent = Depends(get_current_agent),
+    accept: Optional[str] = Header(None),
+):
+    check_naan(mdb, naan)
+    check_can_update_individual(agent, get_shoulder(assigned_base_name))
+    indiv_uri = f"{API_HOST}/ark:{naan}/{assigned_base_name}"
+    raise404_if_none(mdb.arks.find_one({"@id": indiv_uri}))
+
+    mdb.arks.update_one({"@id": indiv_uri}, unset_equivalences())
+    mdb.arks.update_one({"@id": indiv_uri}, indiv_update.update)
+    indiv_doc = mdb.arks.find_one({"@id": indiv_uri})
+    return jsonld_doc_response(indiv_doc, accept)
+
+
+@app.post(
     "/ark:{naan}/{year}/{month}/{org}/{repo}",
     tags=["terms"],
 )
 async def create_term(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -302,7 +398,7 @@ async def create_term(
 ):
     check_naan(mdb, naan)
     check_too_late(year, month)
-    check_can_update(agent, org, repo)
+    check_can_update_term(agent, org, repo)
 
     term_uri = f"{API_HOST}/ark:{naan}/{year}/{month:02d}/{org}/{repo}/{term}"
     if mdb.terms.find_one({"@id": term_uri}):
@@ -320,7 +416,7 @@ async def create_term(
     tags=["terms"],
 )
 async def get_term(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -342,7 +438,7 @@ async def get_term(
     tags=["terms"],
 )
 async def update_term(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -355,11 +451,11 @@ async def update_term(
 ):
     check_naan(mdb, naan)
     check_too_late(year, month)
-    check_can_update(agent, org, repo)
+    check_can_update_term(agent, org, repo)
     term_uri = f"{API_HOST}/ark:{naan}/{year}/{month:02d}/{org}/{repo}/{term}"
     raise404_if_none(mdb.terms.find_one({"@id": term_uri}))
 
-    mdb.terms.update_one({"@id": term_uri}, unset_term_equivalences())
+    mdb.terms.update_one({"@id": term_uri}, unset_equivalences())
     mdb.terms.update_one({"@id": term_uri}, term_update.update)
     term_doc = mdb.terms.find_one({"@id": term_uri})
     return jsonld_doc_response(term_doc, accept)
@@ -370,7 +466,7 @@ async def update_term(
     tags=["terms"],
 )
 async def delete_term(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -381,7 +477,7 @@ async def delete_term(
 ):
     check_naan(mdb, naan)
     check_too_late(year, month)
-    check_can_update(agent, org, repo)
+    check_can_update_term(agent, org, repo)
     term_uri = f"{API_HOST}/ark:{naan}/{year}/{month:02d}/{org}/{repo}/{term}"
     raise404_if_none(mdb.terms.find_one({"@id": term_uri}))
 
@@ -394,7 +490,7 @@ async def delete_term(
     tags=["namespaces"],
 )
 async def create_namespace(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -406,7 +502,7 @@ async def create_namespace(
 ):
     check_naan(mdb, naan)
     check_too_late(year, month)
-    check_can_update(agent, org, repo)
+    check_can_update_term(agent, org, repo)
 
     term_namespace_uri = f"{API_HOST}/ark:{naan}/{year}/{month:02d}/{org}/{repo}"
     if mdb.namespaces.find_one({"@id": term_namespace_uri}):
@@ -425,7 +521,7 @@ async def create_namespace(
     tags=["namespaces"],
 )
 async def get_namespace(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -451,7 +547,7 @@ async def get_namespace(
     tags=["namespaces"],
 )
 async def update_namespace(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -463,7 +559,7 @@ async def update_namespace(
 ):
     check_naan(mdb, naan)
     check_too_late(year, month)
-    check_can_update(agent, org, repo)
+    check_can_update_term(agent, org, repo)
     term_namespace_uri = f"{API_HOST}/ark:{naan}/{year}/{month:02d}/{org}/{repo}"
     raise404_if_none(mdb.namespaces.find_one({"@id": term_namespace_uri}))
 
@@ -477,7 +573,7 @@ async def update_namespace(
     tags=["namespaces"],
 )
 async def delete_namespace(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -487,7 +583,7 @@ async def delete_namespace(
 ):
     check_naan(mdb, naan)
     check_too_late(year, month)
-    check_can_update(agent, org, repo)
+    check_can_update_term(agent, org, repo)
     term_namespace_uri = f"{API_HOST}/ark:{naan}/{year}/{month:02d}/{org}/{repo}"
     raise404_if_none(mdb.namespaces.find_one({"@id": term_namespace_uri}))
 
@@ -505,7 +601,7 @@ term_namespace_pattern = re.compile(
     tags=["agents"],
 )
 async def create_agent(
-    naan: int,
+    naan: ArkNaan,
     agent_in: AgentIn,
     mdb: MongoDatabase = Depends(mongo_db),
     requester_agent: Agent = Depends(get_current_agent),
@@ -536,7 +632,7 @@ async def create_agent(
     tags=["agents"],
 )
 async def get_agent(
-    naan: int,
+    naan: ArkNaan,
     username: str,
     mdb: MongoDatabase = Depends(mongo_db),
     requester_agent: Agent = Depends(get_current_agent),
@@ -556,7 +652,7 @@ async def get_agent(
     tags=["agents"],
 )
 async def update_agent(
-    naan: int,
+    naan: ArkNaan,
     username: str,
     update: DocUpdate,
     mdb: MongoDatabase = Depends(mongo_db),
@@ -579,7 +675,7 @@ async def update_agent(
     tags=["agents"],
 )
 async def delete_agent(
-    naan: int,
+    naan: ArkNaan,
     username: str,
     mdb: MongoDatabase = Depends(mongo_db),
     requester_agent: Agent = Depends(get_current_agent),
@@ -622,7 +718,7 @@ async def ensure_initial_resources_on_boot():
     tags=["util"],
     summary="Get ARK (Slash Before NAAN)",
 )
-async def _ark(naan: int, request: Request):
+async def _ark(naan: ArkNaan, request: Request):
     """normalize request to not have slash (/) preceding ark naan."""
     return RedirectResponse(
         url=str(request.url).replace("ark:/", "ark:"), status_code=301
@@ -635,7 +731,7 @@ async def _ark(naan: int, request: Request):
     summary="Get Namespace (Trailing Slash)",
 )
 async def _get_namespace(
-    naan: int,
+    naan: ArkNaan,
     year: int,
     month: int,
     org: str,
@@ -655,7 +751,7 @@ async def _get_namespace(
     summary="Get ARK (Arbitrary ID Pattern)",
 )
 async def ark(
-    naan: int,
+    naan: ArkNaan,
     rest_of_path,
     request: Request,
     mdb: MongoDatabase = Depends(mongo_db),
@@ -669,7 +765,7 @@ async def ark(
     leaf, variants = leaf_and_variants[0], leaf_and_variants[1:]
     subparts = (parts[1:-1] + [leaf]) if len(parts) > 1 else []
 
-    ark_map_url = ark_map(mdb, naan=str(naan)).get(f"ark:{naan}/{basename}")
+    ark_map_url = ark_map(mdb, naan=naan).get(f"ark:{naan}/{basename}")
     # TODO support ?info inflection via {who,what,when,how} columns in ark_map.csv
     #   See: https://n2t.net/e/n2t_apidoc.html#identifier-metadata
     if ark_map_url:

@@ -1,3 +1,4 @@
+import os
 import secrets
 
 import string
@@ -12,6 +13,12 @@ from toolz import keyfilter
 
 PKG_ROOT_DIR = Path(__file__).parent
 REPO_ROOT_DIR = PKG_ROOT_DIR.parent
+
+HOST = os.environ.get("API_HOST")
+NAAN = os.environ.get("API_AGENT_NAAN")
+USER = os.environ.get("API_AGENT_USERNAME")
+PASS = os.environ.get("API_AGENT_PASSWORD")
+ACCEPT = "application/ld+json,text/turtle;q=0.9,application/rdf+xml;q=0.8,*/*;q=0.5"
 
 
 def pick(whitelist, d):

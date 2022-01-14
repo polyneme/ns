@@ -8,6 +8,10 @@ install the dependencies.
 ```shell
 make init
 # or `make update` if you'd also like to update dependencies to latest permissible versions.
+
+# use patched version of PyLODE (github.com/polyneme/pyLODE)
+# follow https://github.com/RDFLib/pyLODE/issues/159 for resolution
+pip install -e ../pyLODE/.
 ```
 
 Initialize/supply [ARK](https://arks.org/) maps.
