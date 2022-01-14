@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 
 from xyz_polyneme_ns import cli
 from xyz_polyneme_ns.db import mongo_db
+from xyz_polyneme_ns.util import now
 
 
 def cli_invoke(args: List[str]) -> click.testing.Result:
@@ -40,18 +41,16 @@ def test_get_legacy_routes():
     assert "skos:ConceptScheme" in result.stdout
 
 
-def test_create_get_and_update_individual():
+def test_crud_individual():
     result = cli_invoke(["create-individual", "fk1", '{"rdfs:label": "donny"}'])
     assert result.exit_code == 0
-    indiv_doc_created = json.loads(result.stdout)
-    assert "fk1" in indiv_doc_created["@id"]
+    doc_c = json.loads(result.stdout)
+    assert "fk1" in doc_c["@id"]
 
-    assigned_base_name = re.search(
-        r"ark:\d{5}/(?P<abn>\w+)", indiv_doc_created["@id"]
-    ).group("abn")
+    assigned_base_name = re.search(r"ark:\d{5}/(?P<abn>\w+)", doc_c["@id"]).group("abn")
     result = cli_invoke(["get-individual", assigned_base_name])
-    indiv_doc_unchanged = json.loads(result.stdout)
-    assert indiv_doc_unchanged == indiv_doc_created
+    doc_r = json.loads(result.stdout)
+    assert doc_r == doc_c
 
     result = cli_invoke(
         [
@@ -60,10 +59,45 @@ def test_create_get_and_update_individual():
             '{"$set": {"rdfs:comment": "definitely a person"}}',
         ]
     )
-    indiv_doc_updated = json.loads(result.stdout)
-    assert indiv_doc_updated != indiv_doc_created
-    assert indiv_doc_created.get("rdfs:comment") is None
-    assert indiv_doc_updated.get("rdfs:comment") is not None
+    doc_u = json.loads(result.stdout)
+    assert doc_u != doc_c
+    assert doc_c.get("rdfs:comment") is None
+    assert doc_u.get("rdfs:comment") is not None
 
     mdb = mongo_db()
-    mdb.arks.delete_one({"@id": indiv_doc_updated["@id"]})
+    mdb.arks.delete_one({"@id": doc_c["@id"]})
+
+
+def test_crud_namespace():
+    dt = now()
+    test_org = f"/{dt.year}/{dt.month}/testorg"
+    result = cli_invoke(["create-namespace", test_org, "testrepo"])
+    assert result.exit_code == 0
+    doc_c = json.loads(result.stdout)
+    assert "/2022/01/testorg/testrepo" in doc_c["@id"]
+    assert doc_c["@type"] == "owl:Ontology"
+
+    result = cli_invoke(["get-namespace", f"{test_org}/testrepo"])
+    doc_r = json.loads(result.stdout)
+    assert doc_c == doc_r
+
+    result = cli_invoke(
+        [
+            "update-namespace",
+            f"{test_org}/testrepo",
+            '{"$set": {"dc:title": "My Test Namespace"}}',
+        ]
+    )
+    doc_u = json.loads(result.stdout)
+    assert doc_u != doc_c
+    assert doc_c.get("dc:title") is None
+    assert doc_u.get("dc:title") is not None
+
+    mdb = mongo_db()
+    mdb.namespaces.delete_one({"@id": doc_c["@id"]})
+
+
+def test_cannot_create_past_namespace():
+    result = cli_invoke(["create-namespace", "/1000/01/testorg", "testrepo"])
+    doc_err = json.loads(result.stdout)
+    assert "Cannot" in doc_err["detail"]

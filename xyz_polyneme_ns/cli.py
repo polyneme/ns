@@ -36,8 +36,8 @@ def get(path: str, accept: Optional[str] = ACCEPT):
 
 
 @app.command()
-def get_namespace(path: str):
-    rv = req("GET", path)
+def get_namespace(path: str, accept: Optional[str] = ACCEPT):
+    rv = req("GET", path, headers={"Accept": accept})
     typer.echo(rv.content)
 
 

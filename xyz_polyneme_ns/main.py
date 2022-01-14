@@ -267,6 +267,7 @@ async def marda_phonons(accept: Optional[str] = Header(None)):
 
 @app.post(
     "/ark:{naan}/{year}/{month}/{org}/{repo}/{term}:import",
+    status_code=status.HTTP_201_CREATED,
     tags=["terms"],
 )
 async def import_term(
@@ -317,6 +318,7 @@ async def import_term(
 
 @app.post(
     "/ark:{naan}/{shoulder}",
+    status_code=status.HTTP_201_CREATED,
     tags=["individuals"],
 )
 async def create_individual(
@@ -382,6 +384,7 @@ async def update_individual(
 
 @app.post(
     "/ark:{naan}/{year}/{month}/{org}/{repo}",
+    status_code=status.HTTP_201_CREATED,
     tags=["terms"],
 )
 async def create_term(
@@ -487,6 +490,7 @@ async def delete_term(
 
 @app.post(
     "/ark:{naan}/{year}/{month}/{org}",
+    status_code=status.HTTP_201_CREATED,
     tags=["namespaces"],
 )
 async def create_namespace(
@@ -510,7 +514,7 @@ async def create_namespace(
             status_code=status.HTTP_409_CONFLICT, detail="Namespace already exists!"
         )
 
-    ns_doc = assoc(ns_in.dict(), "@id", term_namespace_uri)
+    ns_doc = merge(ns_in.dict(), {"@id": term_namespace_uri, "@type": "owl:Ontology"})
     mdb.namespaces.insert_one(ensure_context(ns_doc))
     ns_doc = mdb.namespaces.find_one({"@id": term_namespace_uri})
     return jsonld_doc_response(dissoc(ns_doc, "_id"), accept)
@@ -598,6 +602,7 @@ term_namespace_pattern = re.compile(
 
 @app.post(
     "/ark:{naan}/9999/12/system/agents",
+    status_code=status.HTTP_201_CREATED,
     tags=["agents"],
 )
 async def create_agent(
