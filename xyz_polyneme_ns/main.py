@@ -774,6 +774,7 @@ async def ark(
     accept: Optional[str] = Header(None),
 ):
     """Fall-through route."""
+    # TODO this is buggy. Fix before you actually endorse/use.
     check_naan(mdb, naan)
     parts = rest_of_path.split("/")
     basename = assigned_base_name.replace("-", "")
