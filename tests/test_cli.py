@@ -62,7 +62,7 @@ def test_crud_skolem():
     mdb.arks.delete_one({"@id": doc_c["@id"]})
 
 
-def test_crud_namespace():
+def _ns_create():
     dt = now()
     test_org = f"/{dt.year}/{dt.month:02}/testorg"
     test_repo = f"{test_org}/testrepo"
@@ -71,6 +71,17 @@ def test_crud_namespace():
     doc_c = json.loads(result.stdout)
     assert test_repo in doc_c["@id"]
     assert doc_c["@type"] == "owl:Ontology"
+    assert doc_c["dct:title"] == "testrepo"
+    return doc_c, test_repo
+
+
+def _ns_delete(id_):
+    mdb = mongo_db()
+    mdb.namespaces.delete_one({"@id": id_})
+
+
+def test_crud_namespace():
+    doc_c, test_repo = _ns_create()
 
     result = cli_invoke(["ns", "read", test_repo])
     doc_r = json.loads(result.stdout)
@@ -81,25 +92,19 @@ def test_crud_namespace():
             "ns",
             "update",
             test_repo,
-            '{"$set": {"dc:title": "My Test Namespace"}}',
+            '{"$set": {"rdfs:comment": "My Test Namespace"}}',
         ]
     )
     doc_u = json.loads(result.stdout)
     assert doc_u != doc_c
-    assert doc_c.get("dc:title") is None
-    assert doc_u.get("dc:title") is not None
+    assert doc_c.get("rdfs:comment") is None
+    assert doc_u.get("rdfs:comment") is not None
 
-    mdb = mongo_db()
-    mdb.namespaces.delete_one({"@id": doc_c["@id"]})
+    _ns_delete(doc_c["@id"])
 
 
 def test_crud_term():
-    dt = now()
-    test_org = f"/{dt.year}/{dt.month:02}/testorg"
-    test_repo = f"{test_org}/testrepo"
-    result = cli_invoke(["ns", "create", test_org, "testrepo"])
-    assert result.exit_code == 0
-    ns_doc_c = json.loads(result.stdout)
+    ns_doc_c, test_repo = _ns_create()
 
     result = cli_invoke(
         ["term", "create", test_repo, "testterm", '{"rdfs:label": "Test Term"}']
@@ -128,7 +133,7 @@ def test_crud_term():
 
     mdb = mongo_db()
     mdb.terms.delete_one({"@id": doc_c["@id"]})
-    mdb.namespaces.delete_one({"@id": ns_doc_c["@id"]})
+    _ns_delete(ns_doc_c["@id"])
 
 
 def test_cannot_create_past_namespace():

@@ -84,7 +84,7 @@ DEFAULT_JSONLD_CONTEXT = {
     "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
     "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
-    "dc": "http://purl.org/dc/elements/1.1/",
+    "dct": "http://purl.org/dc/terms/",
 }
 
 
@@ -524,7 +524,11 @@ async def create_namespace(
             status_code=status.HTTP_409_CONFLICT, detail="Namespace already exists!"
         )
 
-    ns_doc = merge(ns_in.dict(), {"@id": term_namespace_uri, "@type": "owl:Ontology"})
+    ns_doc = merge(
+        {"dct:title": repo},
+        ns_in.dict(),
+        {"@id": term_namespace_uri, "@type": "owl:Ontology"},
+    )
     mdb.namespaces.insert_one(ensure_context(ns_doc))
     ns_doc = mdb.namespaces.find_one({"@id": term_namespace_uri})
     return jsonld_doc_response(dissoc(ns_doc, "_id"), accept)
