@@ -95,10 +95,3 @@ class Agent(BaseModel):
     can_edit: List[Repo]
     can_admin: List[Union[Org, Repo]]
     type: AgentType
-
-
-class IndividualIn(BaseModel):
-    username: Username
-    password: str
-    can_edit: List[Repo]
-    type: AgentType

@@ -9,8 +9,8 @@ install the dependencies.
 make init
 # or `make update` if you'd also like to update dependencies to latest permissible versions.
 
-# use patched version of PyLODE (github.com/polyneme/pyLODE)
-# follow https://github.com/RDFLib/pyLODE/issues/159 for resolution
+# use master branch of PyLODE (github.com/RDFLib/pyLODE/)
+# until next pyLODE release (>=3.0.2).
 pip install -e ../pyLODE/.
 ```
 
@@ -81,6 +81,10 @@ make up-dev
 
 - *namespaces* - JSON-LD docs of metadata about term namespaces (the part before the last `/` of a
   term URL, an org/repo qualified by yyyy/mm and by ark naan). Should be `a owl:Ontology .`
+
+- *skolems* - akin to ["skolemized blank nodes"](https://www.w3.org/2011/rdf-wg/wiki/Skolemisation).
+  Entities for which you need stability of identity but don’t need to give it a human-understandable
+  sign in the URL path, i.e. it need not be a *term*.
 
 - *agents*: users and their software agents that authenticate and CRUD resources. PLEASE just use
   HTTP Basic Auth. FastAPI has good support and documentation for it. You can store passwords hashed

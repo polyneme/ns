@@ -52,10 +52,14 @@ from xyz_polyneme_ns.util import (
 )
 
 tags_metadata = [
-    {"name": "terms", "description": "the things in namespaces"},
     {
         "name": "namespaces",
         "description": "the things that contain terms (aka vocabularies, ontologies, etc.)",
+    },
+    {"name": "terms", "description": "the things in namespaces"},
+    {
+        "name": "skolems",
+        "description": "things that don't need to be identified by human-readable signs",
     },
     {"name": "agents", "description": "do stuff using credentials"},
     {"name": "util", "description": "redirects, catch-alls, etc."},
@@ -158,11 +162,11 @@ def check_can_update_term(agent: Agent, org: str, repo: str):
         )
 
 
-def check_can_update_individual(agent: Agent, shoulder: ArkShoulder):
+def check_can_update_skolem(agent: Agent, shoulder: ArkShoulder):
     if not any(item == shoulder for item in agent.can_admin_shoulders):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Agent {agent.username} cannot update individual with shoulder {shoulder}.",
+            detail=f"Agent {agent.username} cannot update skolem with shoulder {shoulder}.",
         )
 
 
@@ -319,22 +323,22 @@ async def import_term(
 @app.post(
     "/ark:{naan}/{shoulder}",
     status_code=status.HTTP_201_CREATED,
-    tags=["individuals"],
+    tags=["skolems"],
 )
-async def create_individual(
+async def create_skolem(
     naan: ArkNaan,
     shoulder: ArkShoulder,
-    individual_in: Doc,
+    skolem_in: Doc,
     mdb: MongoDatabase = Depends(mongo_db),
     agent: Agent = Depends(get_current_agent),
     accept: Optional[str] = Header(None),
 ):
     check_naan(mdb, naan)
-    check_can_update_individual(agent, shoulder)
+    check_can_update_skolem(agent, shoulder)
     check_shoulder_registered(mdb, naan, shoulder)
 
     ark_new = create_ark_bon(mdb=mdb, naan=naan, shoulder=shoulder)
-    ark_doc = assoc(individual_in.dict(), "@id", f"{API_HOST}/{ark_new}")
+    ark_doc = assoc(skolem_in.dict(), "@id", f"{API_HOST}/{ark_new}")
     mdb.arks.replace_one({"_id": ark_new}, ensure_context(ark_doc), upsert=False)
     ark_doc = mdb.arks.find_one({"_id": ark_new})
     ark_map.cache_clear()
@@ -343,9 +347,9 @@ async def create_individual(
 
 @app.get(
     "/ark:{naan}/{assigned_base_name}",
-    tags=["individuals"],
+    tags=["skolems"],
 )
-async def get_individual(
+async def get_skolem(
     naan: ArkNaan,
     assigned_base_name: str,
     mdb: MongoDatabase = Depends(mongo_db),
@@ -361,9 +365,9 @@ async def get_individual(
 
 @app.patch(
     "/ark:{naan}/{assigned_base_name}",
-    tags=["individuals"],
+    tags=["skolems"],
 )
-async def update_individual(
+async def update_skolem(
     naan: ArkNaan,
     assigned_base_name: str,
     indiv_update: DocUpdate,
@@ -372,7 +376,7 @@ async def update_individual(
     accept: Optional[str] = Header(None),
 ):
     check_naan(mdb, naan)
-    check_can_update_individual(agent, get_shoulder(assigned_base_name))
+    check_can_update_skolem(agent, get_shoulder(assigned_base_name))
     indiv_uri = f"{API_HOST}/ark:{naan}/{assigned_base_name}"
     raise404_if_none(mdb.arks.find_one({"@id": indiv_uri}))
 

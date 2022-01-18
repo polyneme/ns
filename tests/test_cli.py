@@ -7,54 +7,42 @@ from typing import List
 import click.testing
 from typer.testing import CliRunner
 
-from xyz_polyneme_ns import cli
+from xyz_polyneme_ns.cli.main import app
 from xyz_polyneme_ns.db import mongo_db
 from xyz_polyneme_ns.util import now
 
 
 def cli_invoke(args: List[str]) -> click.testing.Result:
-    return CliRunner().invoke(cli.app, args)
+    return CliRunner().invoke(app, args)
 
 
-def test_hello():
-    result = cli_invoke(["hello", "Donny"])
-    assert result.exit_code == 0
-
-
-def test_goodbye():
-    result = cli_invoke(["goodbye", "Donny"])
-    assert result.exit_code == 0
-    assert result.stdout.startswith("Bye")
-    result = cli_invoke(["goodbye", "--formal", "Donny"])
-    assert result.stdout.startswith("Goodbye")
-
-
-def test_get_legacy_routes():
-    result = cli_invoke(["get", "/2021/04/marda-dd/test", "--accept", "text/turtle"])
+def test_read_legacy_routes():
+    result = cli_invoke(["read", "/2021/04/marda-dd/test", "--accept", "text/turtle"])
     assert result.stdout.startswith("@prefix")
     assert "vulgar" in result.stdout
 
     result = cli_invoke(
-        ["get", "/ark:57802/2021/08/mardaphonons", "--accept", "text/turtle"]
+        ["read", "/ark:57802/2021/08/mardaphonons", "--accept", "text/turtle"]
     )
     assert result.stdout.startswith("@prefix")
     assert "skos:ConceptScheme" in result.stdout
 
 
-def test_crud_individual():
-    result = cli_invoke(["create-individual", "fk1", '{"rdfs:label": "donny"}'])
+def test_crud_skolem():
+    result = cli_invoke(["skolem", "create", "fk1", '{"rdfs:label": "donny"}'])
     assert result.exit_code == 0
     doc_c = json.loads(result.stdout)
     assert "fk1" in doc_c["@id"]
 
     assigned_base_name = re.search(r"ark:\d{5}/(?P<abn>\w+)", doc_c["@id"]).group("abn")
-    result = cli_invoke(["get-individual", assigned_base_name])
+    result = cli_invoke(["skolem", "read", assigned_base_name])
     doc_r = json.loads(result.stdout)
     assert doc_r == doc_c
 
     result = cli_invoke(
         [
-            "update-individual",
+            "skolem",
+            "update",
             assigned_base_name,
             '{"$set": {"rdfs:comment": "definitely a person"}}',
         ]
@@ -70,21 +58,23 @@ def test_crud_individual():
 
 def test_crud_namespace():
     dt = now()
-    test_org = f"/{dt.year}/{dt.month}/testorg"
-    result = cli_invoke(["create-namespace", test_org, "testrepo"])
+    test_org = f"/{dt.year}/{dt.month:02}/testorg"
+    test_repo = f"{test_org}/testrepo"
+    result = cli_invoke(["ns", "create", test_org, "testrepo"])
     assert result.exit_code == 0
     doc_c = json.loads(result.stdout)
-    assert "/2022/01/testorg/testrepo" in doc_c["@id"]
+    assert test_repo in doc_c["@id"]
     assert doc_c["@type"] == "owl:Ontology"
 
-    result = cli_invoke(["get-namespace", f"{test_org}/testrepo"])
+    result = cli_invoke(["ns", "read", test_repo])
     doc_r = json.loads(result.stdout)
     assert doc_c == doc_r
 
     result = cli_invoke(
         [
-            "update-namespace",
-            f"{test_org}/testrepo",
+            "ns",
+            "update",
+            test_repo,
             '{"$set": {"dc:title": "My Test Namespace"}}',
         ]
     )
@@ -97,7 +87,45 @@ def test_crud_namespace():
     mdb.namespaces.delete_one({"@id": doc_c["@id"]})
 
 
+def test_crud_term():
+    dt = now()
+    test_org = f"/{dt.year}/{dt.month:02}/testorg"
+    test_repo = f"{test_org}/testrepo"
+    result = cli_invoke(["ns", "create", test_org, "testrepo"])
+    assert result.exit_code == 0
+    ns_doc_c = json.loads(result.stdout)
+
+    result = cli_invoke(
+        ["term", "create", test_repo, "testterm", '{"rdfs:label": "Test Term"}']
+    )
+    term_id = f"{test_repo}/testterm"
+    doc_c = json.loads(result.stdout)
+    assert doc_c["@id"].endswith(term_id)
+    assert doc_c["rdfs:label"] == "Test Term"
+
+    result = cli_invoke(["term", "read", term_id])
+    doc_r = json.loads(result.stdout)
+    assert doc_c == doc_r
+
+    result = cli_invoke(
+        [
+            "term",
+            "update",
+            term_id,
+            '{"$set": {"rdfs:label": "Testy Term"}}',
+        ]
+    )
+    doc_u = json.loads(result.stdout)
+    assert doc_u != doc_c
+    assert doc_c.get("rdfs:label") == "Test Term"
+    assert doc_u.get("rdfs:label") == "Testy Term"
+
+    mdb = mongo_db()
+    mdb.terms.delete_one({"@id": doc_c["@id"]})
+    mdb.namespaces.delete_one({"@id": ns_doc_c["@id"]})
+
+
 def test_cannot_create_past_namespace():
-    result = cli_invoke(["create-namespace", "/1000/01/testorg", "testrepo"])
+    result = cli_invoke(["ns", "create", "/1000/01/testorg", "testrepo"])
     doc_err = json.loads(result.stdout)
     assert "Cannot" in doc_err["detail"]
