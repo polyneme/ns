@@ -28,6 +28,12 @@ def test_read_legacy_routes():
     assert "skos:ConceptScheme" in result.stdout
 
 
+def test_skolem_transient_redirect():
+    result = cli_invoke(["skolem", "read", "fk1234", "--accept", "text/html"])
+    # XXX redirects to http://example.org
+    assert "<title>Example Domain</title>" in result.stdout
+
+
 def test_crud_skolem():
     result = cli_invoke(["skolem", "create", "fk1", '{"rdfs:label": "donny"}'])
     assert result.exit_code == 0
@@ -129,3 +135,19 @@ def test_cannot_create_past_namespace():
     result = cli_invoke(["ns", "create", "/1000/01/testorg", "testrepo"])
     doc_err = json.loads(result.stdout)
     assert "Cannot" in doc_err["detail"]
+
+
+def test_ark_explain():
+    result = cli_invoke(
+        ["read", "/explain/ark:57802/fk1234/subpart1/subpart2/leaf.variant1.variant2"]
+    )
+    doc = {
+        "resolver": "http://localhost:8000/",
+        "nma": "localhost:8000",
+        "naan": "57802",
+        "basename": "fk1234",
+        "subparts": ["subpart1", "subpart2", "leaf"],
+        "variants": ["variant1", "variant2"],
+    }
+    doc_r = json.loads(result.stdout)
+    assert doc == doc_r

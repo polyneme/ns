@@ -357,6 +357,12 @@ async def get_skolem(
 ):
     check_naan(mdb, naan)
 
+    ark_map_url = ark_map(mdb, naan=naan).get(f"ark:{naan}/{assigned_base_name}")
+    # TODO support ?info inflection for {who,what,when,how}
+    #   See: https://n2t.net/e/n2t_apidoc.html#identifier-metadata
+    if ark_map_url:
+        return RedirectResponse(url=ark_map_url, status_code=303)
+
     indiv_uri = f"{API_HOST}/ark:{naan}/{assigned_base_name}"
     indiv_doc = raise404_if_none(mdb.arks.find_one({"@id": indiv_uri}))
 
@@ -755,13 +761,14 @@ async def _get_namespace(
 
 
 @app.get(
-    "/ark:{naan}/{rest_of_path:path}",
+    "/explain/ark:{naan}/{assigned_base_name}/{rest_of_path:path}",
     tags=["util"],
     summary="Get ARK (Arbitrary ID Pattern)",
 )
 async def ark(
-    naan: ArkNaan,
-    rest_of_path,
+    naan: int,
+    assigned_base_name: str,
+    rest_of_path: str,
     request: Request,
     mdb: MongoDatabase = Depends(mongo_db),
     accept: Optional[str] = Header(None),
@@ -769,22 +776,18 @@ async def ark(
     """Fall-through route."""
     check_naan(mdb, naan)
     parts = rest_of_path.split("/")
-    basename = parts[0].replace("-", "")
+    basename = assigned_base_name.replace("-", "")
     leaf_and_variants = parts[-1].split(".")
     leaf, variants = leaf_and_variants[0], leaf_and_variants[1:]
-    subparts = (parts[1:-1] + [leaf]) if len(parts) > 1 else []
+    subparts = parts[:-1] + [leaf]
 
-    ark_map_url = ark_map(mdb, naan=naan).get(f"ark:{naan}/{basename}")
     # TODO support ?info inflection via {who,what,when,how} columns in ark_map.csv
     #   See: https://n2t.net/e/n2t_apidoc.html#identifier-metadata
-    if ark_map_url:
-        return RedirectResponse(url=ark_map_url, status_code=303)
-    else:
-        return {
-            "resolver": str(request.base_url),
-            "nma": str(request.base_url).split("/")[-2],
-            "naan": "57802",
-            "basename": basename,
-            "subparts": subparts,
-            "variants": variants,
-        }
+    return {
+        "resolver": str(request.base_url),
+        "nma": str(request.base_url).split("/")[-2],
+        "naan": "57802",
+        "basename": basename,
+        "subparts": subparts,
+        "variants": variants,
+    }
