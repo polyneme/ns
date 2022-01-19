@@ -390,10 +390,10 @@ async def update_skolem(
 
     try:
         mdb.arks.update_one({"@id": indiv_uri}, indiv_update.update)
-    except ValueError as ve:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"mongo update api: {ve}",
+            detail=f"mongo update api: {e}",
         )
 
     indiv_doc = mdb.arks.find_one({"@id": indiv_uri})
@@ -480,10 +480,10 @@ async def update_term(
 
     try:
         mdb.terms.update_one({"@id": term_uri}, term_update.update)
-    except ValueError as ve:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"mongo update api: {ve}",
+            detail=f"mongo update api: {e}",
         )
 
     term_doc = mdb.terms.find_one({"@id": term_uri})
@@ -599,10 +599,10 @@ async def update_namespace(
 
     try:
         mdb.namespaces.update_one({"@id": term_namespace_uri}, update.update)
-    except ValueError as ve:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"mongo update api: {ve}",
+            detail=f"mongo update api: {e}",
         )
 
     ns_doc = mdb.namespaces.find_one({"@id": term_namespace_uri})
