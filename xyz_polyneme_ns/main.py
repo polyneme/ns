@@ -90,7 +90,8 @@ DEFAULT_JSONLD_CONTEXT = {
 
 
 def ensure_context(d):
-    return merge({"@context": DEFAULT_JSONLD_CONTEXT}, d)
+    d["@context"] = merge(DEFAULT_JSONLD_CONTEXT, d.get("@context", {}))
+    return d
 
 
 def sorted_media_types(accept: str) -> List[str]:
