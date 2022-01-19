@@ -387,7 +387,15 @@ async def update_skolem(
     raise404_if_none(mdb.arks.find_one({"@id": indiv_uri}))
 
     mdb.arks.update_one({"@id": indiv_uri}, unset_equivalences())
-    mdb.arks.update_one({"@id": indiv_uri}, indiv_update.update)
+
+    try:
+        mdb.arks.update_one({"@id": indiv_uri}, indiv_update.update)
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"mongo update api: {ve}",
+        )
+
     indiv_doc = mdb.arks.find_one({"@id": indiv_uri})
     return jsonld_doc_response(indiv_doc, accept)
 
@@ -469,7 +477,15 @@ async def update_term(
     raise404_if_none(mdb.terms.find_one({"@id": term_uri}))
 
     mdb.terms.update_one({"@id": term_uri}, unset_equivalences())
-    mdb.terms.update_one({"@id": term_uri}, term_update.update)
+
+    try:
+        mdb.terms.update_one({"@id": term_uri}, term_update.update)
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"mongo update api: {ve}",
+        )
+
     term_doc = mdb.terms.find_one({"@id": term_uri})
     return jsonld_doc_response(term_doc, accept)
 
@@ -581,7 +597,14 @@ async def update_namespace(
     term_namespace_uri = f"{API_HOST}/ark:{naan}/{year}/{month:02d}/{org}/{repo}"
     raise404_if_none(mdb.namespaces.find_one({"@id": term_namespace_uri}))
 
-    mdb.namespaces.update_one({"@id": term_namespace_uri}, update.update)
+    try:
+        mdb.namespaces.update_one({"@id": term_namespace_uri}, update.update)
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"mongo update api: {ve}",
+        )
+
     ns_doc = mdb.namespaces.find_one({"@id": term_namespace_uri})
     return jsonld_doc_response(ns_doc, accept)
 

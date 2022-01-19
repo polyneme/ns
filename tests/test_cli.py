@@ -174,7 +174,6 @@ def test_cannot_create_past_namespace():
             EMPTYDOC,
         ]
     )
-    print(result)
     doc_err = json.loads(result.stdout)
     assert "Cannot" in doc_err["detail"]
 
@@ -193,3 +192,15 @@ def test_ark_explain():
     }
     doc_r = json.loads(result.stdout)
     assert doc == doc_r
+
+
+def test_update_missing_dollar_op():
+    ns_doc_c, test_repo = _ns_create()
+    try:
+        result = cli_invoke(
+            "ns update /2022/01/dwi/main -f tests/ns_update_noset.json".split()
+        )
+        doc_err = json.loads(result.stdout)
+        assert "update only works with $ operators" in doc_err["detail"]
+    finally:
+        _ns_delete(ns_doc_c["@id"])
