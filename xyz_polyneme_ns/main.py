@@ -445,6 +445,9 @@ async def get_term(
     org: str,
     repo: str,
     term: str,
+    _mediatype: Optional[
+        str
+    ] = None,  # https://www.w3.org/TR/dx-prof-conneg/#qsa-key-naming
     mdb: MongoDatabase = Depends(mongo_db),
     accept: Optional[str] = Header(None),
 ):
@@ -453,7 +456,7 @@ async def get_term(
     term_uri = f"{API_HOST}/ark:{naan}/{year}/{month:02d}/{org}/{repo}/{term}"
     term_doc = raise404_if_none(mdb.terms.find_one({"@id": term_uri}))
 
-    return jsonld_doc_response(term_doc, accept)
+    return jsonld_doc_response(term_doc, _mediatype or accept)
 
 
 @app.patch(
@@ -562,6 +565,7 @@ async def get_namespace(
     month: int,
     org: str,
     repo: str,
+    _mediatype: Optional[str] = None,
     mdb: MongoDatabase = Depends(mongo_db),
     accept: Optional[str] = Header(None),
 ):
@@ -575,7 +579,7 @@ async def get_namespace(
     g.parse(data=json.dumps(dissoc(ns_doc, "_id")), format="json-ld")
     for doc in term_docs:
         g.parse(data=json.dumps(dissoc(doc, "_id")), format="json-ld")
-    return response_for(g, accept)
+    return response_for(g, _mediatype or accept)
 
 
 @app.patch(
