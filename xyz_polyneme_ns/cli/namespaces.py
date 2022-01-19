@@ -11,8 +11,10 @@ app = typer.Typer()
 
 
 @app.command()
-def create(org: str, repo: str):
-    rv = req("POST", org, params={"repo": repo}, json={})
+def create(
+    org: str, repo: str, file: typer.FileText = typer.Option(..., "--file", "-f")
+):
+    rv = req("POST", org, params={"repo": repo}, json=json.load(file))
     typer.echo(rv.content)
 
 
@@ -23,6 +25,9 @@ def read(ns_path: str, accept: Optional[str] = ACCEPT):
 
 
 @app.command()
-def update(path: str, ns_in: str):
-    rv = req("PATCH", path, json={"update": json.loads(ns_in)})
+def update(ns_path: str, file: typer.FileText = typer.Option(..., "--file", "-f")):
+    rv = req("PATCH", ns_path, json={"update": json.load(file)})
     typer.echo(rv.content)
+
+
+# TODO `def list` to list existing namespaces that I can_admin or can_edit.

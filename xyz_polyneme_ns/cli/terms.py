@@ -11,8 +11,10 @@ app = typer.Typer()
 
 
 @app.command()
-def create(path: str, term: str, term_in: str):
-    rv = req("POST", path, params={"term": term}, json=json.loads(term_in))
+def create(
+    ns_path: str, term: str, file: typer.FileText = typer.Option(..., "--file", "-f")
+):
+    rv = req("POST", ns_path, params={"term": term}, json=json.load(file))
     typer.echo(rv.content)
 
 
@@ -23,6 +25,6 @@ def read(term_path: str, accept: Optional[str] = ACCEPT):
 
 
 @app.command()
-def update(path: str, term_in: str):
-    rv = req("PATCH", path, json={"update": json.loads(term_in)})
+def update(term_path: str, file: typer.FileText = typer.Option(..., "--file", "-f")):
+    rv = req("PATCH", term_path, json={"update": json.load(file)})
     typer.echo(rv.content)

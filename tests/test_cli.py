@@ -9,7 +9,10 @@ from typer.testing import CliRunner
 
 from xyz_polyneme_ns.cli.main import app
 from xyz_polyneme_ns.db import mongo_db
-from xyz_polyneme_ns.util import now
+from xyz_polyneme_ns.util import now, REPO_ROOT_DIR
+
+TESTS_DIR = REPO_ROOT_DIR.joinpath("tests")
+EMPTYDOC = TESTS_DIR.joinpath("emptydoc.json")
 
 
 def cli_invoke(args: List[str]) -> click.testing.Result:
@@ -35,7 +38,9 @@ def test_skolem_transient_redirect():
 
 
 def test_crud_skolem():
-    result = cli_invoke(["skolem", "create", "fk1", '{"rdfs:label": "donny"}'])
+    result = cli_invoke(
+        ["skolem", "create", "fk1", "-f", TESTS_DIR.joinpath("skolem_create.json")]
+    )
     assert result.exit_code == 0
     doc_c = json.loads(result.stdout)
     assert "fk1" in doc_c["@id"]
@@ -50,7 +55,8 @@ def test_crud_skolem():
             "skolem",
             "update",
             assigned_base_name,
-            '{"$set": {"rdfs:comment": "definitely a person"}}',
+            "-f",
+            TESTS_DIR.joinpath("skolem_update.json"),
         ]
     )
     doc_u = json.loads(result.stdout)
@@ -66,7 +72,16 @@ def _ns_create():
     dt = now()
     test_org = f"/{dt.year}/{dt.month:02}/testorg"
     test_repo = f"{test_org}/testrepo"
-    result = cli_invoke(["ns", "create", test_org, "testrepo"])
+    result = cli_invoke(
+        [
+            "ns",
+            "create",
+            test_org,
+            "testrepo",
+            "-f",
+            EMPTYDOC,
+        ]
+    )
     assert result.exit_code == 0
     doc_c = json.loads(result.stdout)
     assert test_repo in doc_c["@id"]
@@ -83,61 +98,83 @@ def _ns_delete(id_):
 def test_crud_namespace():
     doc_c, test_repo = _ns_create()
 
-    result = cli_invoke(["ns", "read", test_repo])
-    doc_r = json.loads(result.stdout)
-    assert doc_c == doc_r
+    try:
+        result = cli_invoke(["ns", "read", test_repo])
+        doc_r = json.loads(result.stdout)
+        assert doc_c == doc_r
 
-    result = cli_invoke(
-        [
-            "ns",
-            "update",
-            test_repo,
-            '{"$set": {"rdfs:comment": "My Test Namespace"}}',
-        ]
-    )
-    doc_u = json.loads(result.stdout)
-    assert doc_u != doc_c
-    assert doc_c.get("rdfs:comment") is None
-    assert doc_u.get("rdfs:comment") is not None
-
-    _ns_delete(doc_c["@id"])
+        result = cli_invoke(
+            [
+                "ns",
+                "update",
+                test_repo,
+                "-f",
+                TESTS_DIR.joinpath("ns_update.json"),
+            ]
+        )
+        doc_u = json.loads(result.stdout)
+        assert doc_u != doc_c
+        assert doc_c.get("rdfs:comment") is None
+        assert doc_u.get("rdfs:comment") is not None
+    finally:
+        _ns_delete(doc_c["@id"])
 
 
 def test_crud_term():
     ns_doc_c, test_repo = _ns_create()
 
-    result = cli_invoke(
-        ["term", "create", test_repo, "testterm", '{"rdfs:label": "Test Term"}']
-    )
-    term_id = f"{test_repo}/testterm"
-    doc_c = json.loads(result.stdout)
-    assert doc_c["@id"].endswith(term_id)
-    assert doc_c["rdfs:label"] == "Test Term"
+    try:
+        result = cli_invoke(
+            [
+                "term",
+                "create",
+                test_repo,
+                "testterm",
+                "-f",
+                TESTS_DIR.joinpath("term_create.json"),
+            ]
+        )
+        term_id = f"{test_repo}/testterm"
+        doc_c = json.loads(result.stdout)
+        assert doc_c["@id"].endswith(term_id)
+        assert doc_c["rdfs:label"] == "Test Term"
 
-    result = cli_invoke(["term", "read", term_id])
-    doc_r = json.loads(result.stdout)
-    assert doc_c == doc_r
+        result = cli_invoke(["term", "read", term_id])
+        doc_r = json.loads(result.stdout)
+        assert doc_c == doc_r
 
-    result = cli_invoke(
-        [
-            "term",
-            "update",
-            term_id,
-            '{"$set": {"rdfs:label": "Testy Term"}}',
-        ]
-    )
-    doc_u = json.loads(result.stdout)
-    assert doc_u != doc_c
-    assert doc_c.get("rdfs:label") == "Test Term"
-    assert doc_u.get("rdfs:label") == "Testy Term"
+        result = cli_invoke(
+            [
+                "term",
+                "update",
+                term_id,
+                "-f",
+                TESTS_DIR.joinpath("term_update.json"),
+            ]
+        )
+        doc_u = json.loads(result.stdout)
+        assert doc_u != doc_c
+        assert doc_c.get("rdfs:label") == "Test Term"
+        assert doc_u.get("rdfs:label") == "Testy Term"
 
-    mdb = mongo_db()
-    mdb.terms.delete_one({"@id": doc_c["@id"]})
-    _ns_delete(ns_doc_c["@id"])
+        mdb = mongo_db()
+        mdb.terms.delete_one({"@id": doc_c["@id"]})
+    finally:
+        _ns_delete(ns_doc_c["@id"])
 
 
 def test_cannot_create_past_namespace():
-    result = cli_invoke(["ns", "create", "/1000/01/testorg", "testrepo"])
+    result = cli_invoke(
+        [
+            "ns",
+            "create",
+            "/1000/01/testorg",
+            "testrepo",
+            "-f",
+            EMPTYDOC,
+        ]
+    )
+    print(result)
     doc_err = json.loads(result.stdout)
     assert "Cannot" in doc_err["detail"]
 

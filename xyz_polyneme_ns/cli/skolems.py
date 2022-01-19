@@ -11,8 +11,8 @@ app = typer.Typer()
 
 
 @app.command()
-def create(shoulder: str, skolem_in: str):
-    rv = req("POST", f"/{shoulder}", json=json.loads(skolem_in))
+def create(shoulder: str, file: typer.FileText = typer.Option(..., "--file", "-f")):
+    rv = req("POST", f"/{shoulder}", json=json.load(file))
     typer.echo(rv.content)
 
 
@@ -23,6 +23,8 @@ def read(assigned_base_name: str, accept: Optional[str] = ACCEPT):
 
 
 @app.command()
-def update(assigned_base_name: str, skolem_in: str):
-    rv = req("PATCH", f"/{assigned_base_name}", json={"update": json.loads(skolem_in)})
+def update(
+    assigned_base_name: str, file: typer.FileText = typer.Option(..., "--file", "-f")
+):
+    rv = req("PATCH", f"/{assigned_base_name}", json={"update": json.load(file)})
     typer.echo(rv.content)
