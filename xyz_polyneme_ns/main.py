@@ -710,7 +710,7 @@ async def delete_agent(
 
 
 @app.on_event("startup")
-async def ensure_initial_resources_on_boot():
+def ensure_initial_resources_on_boot():
     """ensure these resources are loaded when (re-)booting the system."""
     mdb = mongo_db()
 
@@ -728,7 +728,12 @@ async def ensure_initial_resources_on_boot():
             {"_id": naan, "shoulders": list(shoulders)}
             for naan, shoulders in naan_shoulders.items()
         ]
-    mdb.naans.bulk_write([ReplaceOne(pick(["_id"], d), d, upsert=True) for d in docs])
+    for d in docs:
+        mdb.naans.update_one(
+            {"_id": d["_id"]},
+            {"$addToSet": {"shoulders": {"$each": d["shoulders"]}}},
+            upsert=True,
+        )
 
 
 @app.get(
