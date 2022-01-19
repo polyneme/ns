@@ -31,3 +31,4 @@ def update(ns_path: str, file: typer.FileText = typer.Option(..., "--file", "-f"
 
 
 # TODO `def list` to list existing namespaces that I can_admin or can_edit.
+# TODO `def config` to set default namespace for `update` (`termeric ns update . -f tmp.json`?)
