@@ -355,6 +355,7 @@ async def get_skolem(
     naan: ArkNaan,
     assigned_base_name: str,
     mdb: MongoDatabase = Depends(mongo_db),
+    _mediatype: Optional[str] = None,
     accept: Optional[str] = Header(None),
 ):
     check_naan(mdb, naan)
@@ -368,7 +369,7 @@ async def get_skolem(
     indiv_uri = f"{API_HOST}/ark:{naan}/{assigned_base_name}"
     indiv_doc = raise404_if_none(mdb.arks.find_one({"@id": indiv_uri}))
 
-    return jsonld_doc_response(indiv_doc, accept)
+    return jsonld_doc_response(indiv_doc, _mediatype or accept)
 
 
 @app.patch(
