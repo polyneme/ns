@@ -1,5 +1,7 @@
 Work in Progress.
 
+Currently deployed API: <https://ns.polyneme.xyz/docs>.
+
 # Development
 
 To run the server locally, (optionally) create a new Python virtualenv of your preferred flavor and
