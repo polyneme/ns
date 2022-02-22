@@ -1,3 +1,4 @@
+from operator import itemgetter
 from pathlib import Path
 
 import json
@@ -11,6 +12,7 @@ import csv
 import os
 from collections import defaultdict
 
+from jinja2 import Environment, PackageLoader, select_autoescape
 from pymongo.results import DeleteResult
 from starlette import status
 from starlette.responses import PlainTextResponse
@@ -20,7 +22,7 @@ from typing import Optional, List, Union
 from fastapi import FastAPI, Request, Response, Header, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 import rdflib
-from rdflib import Graph, RDF, OWL, SKOS
+from rdflib import Graph, RDF, OWL, SKOS, RDFS, DCTERMS
 from pymongo import ReplaceOne
 from pymongo.database import Database as MongoDatabase
 
@@ -88,6 +90,10 @@ DEFAULT_JSONLD_CONTEXT = {
     "xsd": "http://www.w3.org/2001/XMLSchema#",
 }
 
+jinja_env = Environment(
+    loader=PackageLoader("xyz_polyneme_ns"), autoescape=select_autoescape()
+)
+
 
 def ensure_context(d):
     d["@context"] = merge(DEFAULT_JSONLD_CONTEXT, d.get("@context", {}))
@@ -116,12 +122,33 @@ def sorted_media_types(accept: str) -> List[str]:
     return [a[0] for a in alternatives]
 
 
+def make_html(g: rdflib.Graph) -> str:
+    ns = g.value(predicate=RDF.type, object=OWL.Ontology) or g.value(
+        predicate=RDF.type, object=SKOS.ConceptScheme
+    )
+    title = g.value(subject=ns, predicate=DCTERMS.title)
+    terms = g.subjects(predicate=RDFS.isDefinedBy, object=ns)
+    term_cards = []
+    for t in terms:
+        term_cards.append(
+            {
+                "url": str(t),
+                "label": g.value(subject=t, predicate=SKOS.prefLabel),
+                "definition": g.value(subject=t, predicate=SKOS.definition),
+            }
+        )
+    term_cards = sorted(term_cards, key=itemgetter("label"))
+
+    template = jinja_env.get_template("namespace.html")
+    return template.render(title=title, term_cards=term_cards)
+
+
 def response_for(g: rdflib.Graph, accept: str):
     types_ = sorted_media_types(accept)
     for media_type in types_:
         if media_type == "text/html" and pylode_able(g):
-            html = pylode.OntDoc(g).make_html()
-            return HTMLResponse(content=html)
+            # html = pylode.OntDoc(g).make_html()
+            return HTMLResponse(content=make_html(g))
         else:
             try:
                 return Response(

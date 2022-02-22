@@ -183,8 +183,8 @@ def test_ark_explain():
         ["read", "/explain/ark:57802/fk1234/subpart1/subpart2/leaf.variant1.variant2"]
     )
     doc = {
-        "resolver": "http://localhost:8000/",
-        "nma": "localhost:8000",
+        "resolver": "https://ns.polyneme.xyz/",
+        "nma": "ns.polyneme.xyz",
         "naan": "57802",
         "basename": "fk1234",
         "subparts": ["subpart1", "subpart2", "leaf"],
@@ -197,8 +197,9 @@ def test_ark_explain():
 def test_update_missing_dollar_op():
     ns_doc_c, test_repo = _ns_create()
     try:
+        dt = now()
         result = cli_invoke(
-            "ns update /2022/01/dwi/main -f tests/ns_update_noset.json".split()
+            f"ns update {test_repo} -f tests/ns_update_noset.json".split()
         )
         doc_err = json.loads(result.stdout)
         assert "update only works with $ operators" in doc_err["detail"]

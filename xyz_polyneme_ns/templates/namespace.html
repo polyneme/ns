@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+  <style>
+   dt { font-style: italic }
+  </style>
+</head>
+<body>
+<h1>{{ title }}</h1>
+<dl>
+  {% for term in term_cards %}
+    <dt><a href="{{ term.url }}">{{ term.label }}</a></dt><dd> {{ term.definition }}</dd>
+  {% endfor %}
+</dl>
+</body>
+</html>
