@@ -122,6 +122,18 @@ def sorted_media_types(accept: str) -> List[str]:
     return [a[0] for a in alternatives]
 
 
+def _get_label(subject, g: rdflib.Graph) -> str:
+    return g.value(subject=subject, predicate=SKOS.prefLabel) or g.value(
+        subject=subject, predicate=RDFS.label
+    )
+
+
+def _get_definition(subject, g: rdflib.Graph) -> str:
+    return g.value(subject=subject, predicate=SKOS.definition) or g.value(
+        subject=subject, predicate=RDFS.comment
+    )
+
+
 def make_html(g: rdflib.Graph) -> str:
     ns = g.value(predicate=RDF.type, object=OWL.Ontology) or g.value(
         predicate=RDF.type, object=SKOS.ConceptScheme
@@ -133,8 +145,8 @@ def make_html(g: rdflib.Graph) -> str:
         term_cards.append(
             {
                 "url": str(t),
-                "label": g.value(subject=t, predicate=SKOS.prefLabel),
-                "definition": g.value(subject=t, predicate=SKOS.definition),
+                "label": _get_label(subject=t, g=g),
+                "definition": _get_definition(subject=t, g=g),
             }
         )
     term_cards = sorted(term_cards, key=itemgetter("label"))
