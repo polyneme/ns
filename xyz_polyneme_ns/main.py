@@ -178,10 +178,12 @@ def make_dataset_html(g: rdflib.Graph) -> str:
         g.parse(data=d_ttl, format="turtle")
         dist_cards.append(
             {
-                "url": str(g.value(subject=d, predicate=DCAT.downloadURL)),
+                "id": str(d),
+                "ark": "ark:" + str(d).split("ark:")[1],
+                "downloadURL": str(g.value(subject=d, predicate=DCAT.downloadURL)),
             }
         )
-    dist_cards = sorted(dist_cards, key=itemgetter("url"))
+    dist_cards = sorted(dist_cards, key=itemgetter("id"))
     print(dist_cards)
 
     template = jinja_env.get_template("dataset.html")

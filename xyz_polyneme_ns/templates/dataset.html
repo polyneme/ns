@@ -13,10 +13,11 @@
 <p> {{ description }}</p>
 <p>Issued: {{ issued }}</p>
 <h2>Distributions</h2>
-<ul>
+<dl>
     {% for dist in dist_cards %}
-        <li><a href="{{ dist.url }}">{{ dist.url }}</a></li>
+        <dt><a href="{{ dist.id }}">{{ dist.ark }}</a></dt>
+        <dd>Download URL: <a href="{{ dist.downloadURL }}">{{ dist.downloadURL }}</a></dd>
     {% endfor %}
-</ul>
+</dl>
 </body>
 </html>
