@@ -87,7 +87,10 @@ DEFAULT_JSONLD_CONTEXT = {
     "owl": "http://www.w3.org/2002/07/owl#",
     "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
     "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "qudt": "http://qudt.org/schema/qudt/",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "prov": "http://www.w3.org/ns/prov#",
 }
 
 jinja_env = Environment(
