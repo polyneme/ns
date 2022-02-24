@@ -155,7 +155,7 @@ def make_ns_html(g: rdflib.Graph) -> str:
     for t in terms:
         term_cards.append(
             {
-                "url": g.value(subject=t, predicate=SKOS.prefLabel),
+                "url": str(t),
                 "label": _get_label(subject=t, g=g),
                 "definition": _get_definition(subject=t, g=g),
             }
