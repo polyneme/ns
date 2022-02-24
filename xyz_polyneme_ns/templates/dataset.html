@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+  <style>
+   dt { font-style: italic }
+   body { max-width: 50em }
+  </style>
+</head>
+<body>
+<h1>{{ title }}</h1>
+<p> {{ description }}</p>
+<p>Issued: {{ issued }}</p>
+<h2>Distributions</h2>
+<ul>
+    {% for dist in dist_cards %}
+        <li><a href="{{ dist.url }}">{{ dist.url }}</a></li>
+    {% endfor %}
+</ul>
+</body>
+</html>

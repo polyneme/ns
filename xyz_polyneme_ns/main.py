@@ -2,7 +2,6 @@ from operator import itemgetter
 from pathlib import Path
 
 import json
-import pylode
 
 import re
 
@@ -12,6 +11,7 @@ import csv
 import os
 from collections import defaultdict
 
+import requests
 from jinja2 import Environment, PackageLoader, select_autoescape
 from pymongo.results import DeleteResult
 from starlette import status
@@ -22,7 +22,7 @@ from typing import Optional, List, Union
 from fastapi import FastAPI, Request, Response, Header, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 import rdflib
-from rdflib import Graph, RDF, OWL, SKOS, RDFS, DCTERMS
+from rdflib import Graph, RDF, OWL, SKOS, RDFS, DCTERMS, DCAT
 from pymongo import ReplaceOne
 from pymongo.database import Database as MongoDatabase
 
@@ -125,6 +125,14 @@ def sorted_media_types(accept: str) -> List[str]:
     return [a[0] for a in alternatives]
 
 
+def html_able(g: rdflib.Graph) -> bool:
+    return (
+        g.value(predicate=RDF.type, object=OWL.Ontology)
+        or g.value(predicate=RDF.type, object=SKOS.ConceptScheme)
+        or g.value(predicate=RDF.type, object=DCAT.Dataset)
+    )
+
+
 def _get_label(subject, g: rdflib.Graph) -> str:
     return g.value(subject=subject, predicate=SKOS.prefLabel) or g.value(
         subject=subject, predicate=RDFS.label
@@ -137,7 +145,7 @@ def _get_definition(subject, g: rdflib.Graph) -> str:
     )
 
 
-def make_html(g: rdflib.Graph) -> str:
+def make_ns_html(g: rdflib.Graph) -> str:
     ns = g.value(predicate=RDF.type, object=OWL.Ontology) or g.value(
         predicate=RDF.type, object=SKOS.ConceptScheme
     )
@@ -147,7 +155,7 @@ def make_html(g: rdflib.Graph) -> str:
     for t in terms:
         term_cards.append(
             {
-                "url": str(t),
+                "url": g.value(subject=t, predicate=SKOS.prefLabel),
                 "label": _get_label(subject=t, g=g),
                 "definition": _get_definition(subject=t, g=g),
             }
@@ -158,11 +166,41 @@ def make_html(g: rdflib.Graph) -> str:
     return template.render(title=title, term_cards=term_cards)
 
 
+def make_dataset_html(g: rdflib.Graph) -> str:
+    ds = g.value(predicate=RDF.type, object=DCAT.Dataset)
+    title = g.value(subject=ds, predicate=DCTERMS.title)
+    description = g.value(subject=ds, predicate=DCTERMS.description)
+    issued = g.value(subject=ds, predicate=DCTERMS.issued)
+    distributions = g.objects(subject=ds, predicate=DCAT.distribution)
+    dist_cards = []
+    for d in distributions:
+        d_ttl = requests.get(str(d), headers={"Accept": "text/turtle"}).text
+        g.parse(data=d_ttl, format="turtle")
+        dist_cards.append(
+            {
+                "url": str(g.value(subject=d, predicate=DCAT.downloadURL)),
+            }
+        )
+    dist_cards = sorted(dist_cards, key=itemgetter("url"))
+    print(dist_cards)
+
+    template = jinja_env.get_template("dataset.html")
+    return template.render(
+        title=title, description=description, issued=issued, dist_cards=dist_cards
+    )
+
+
+def make_html(g: rdflib.Graph) -> str:
+    if g.value(predicate=RDF.type, object=DCAT.Dataset):
+        return make_dataset_html(g)
+    else:
+        return make_ns_html(g)
+
+
 def response_for(g: rdflib.Graph, accept: str):
     types_ = sorted_media_types(accept)
     for media_type in types_:
-        if media_type == "text/html" and pylode_able(g):
-            # html = pylode.OntDoc(g).make_html()
+        if media_type == "text/html" and html_able(g):
             return HTMLResponse(content=make_html(g))
         else:
             try:
@@ -281,12 +319,6 @@ def jsonld_doc_response(jsonld_doc, accept):
     g = Graph()
     g.parse(data=json.dumps(jsonld_doc), format="json-ld")
     return response_for(g, accept)
-
-
-def pylode_able(g: rdflib.Graph) -> bool:
-    return g.value(predicate=RDF.type, object=OWL.Ontology) or g.value(
-        predicate=RDF.type, object=SKOS.ConceptScheme
-    )
 
 
 @app.get("/2021/04/marda-dd/test", summary="MaRDA DD Test", tags=["legacy"])
