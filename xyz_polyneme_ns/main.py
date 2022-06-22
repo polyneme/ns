@@ -324,18 +324,29 @@ def jsonld_doc_response(jsonld_doc, accept):
 
 
 @app.get("/ark:57802/dw0/agu")
-async def agu_index_terms(accept: Optional[str] = Header(None)):
+async def agu_index_terms(
+    accept: Optional[str] = Header(None),
+    _mediatype: Optional[
+        str
+    ] = None,  # https://www.w3.org/TR/dx-prof-conneg/#qsa-key-naming
+):
     return response_for(
         g=load_graph_from_file(
             "agu_index_terms.ttl",
             format_="turtle",
         ),
-        accept=accept,
+        accept=_mediatype or accept,
     )
 
 
 @app.get("/ark:57802/dw0/agu/{code}")
-async def agu_index_term(code: str, accept: Optional[str] = Header(None)):
+async def agu_index_term(
+    code: str,
+    accept: Optional[str] = Header(None),
+    _mediatype: Optional[
+        str
+    ] = None,  # https://www.w3.org/TR/dx-prof-conneg/#qsa-key-naming
+):
     og = rdflib.Graph()
     og.parse("agu_index_terms.ttl", format="turtle")
     results = list(
@@ -351,7 +362,7 @@ async def agu_index_term(code: str, accept: Optional[str] = Header(None)):
     g = rdflib.Graph()
     for s, p, o in results:
         g.add((s, p, o))
-    return response_for(g=g, accept=accept)
+    return response_for(g=g, accept=_mediatype or accept)
 
 
 @app.get("/2021/04/marda-dd/test", summary="MaRDA DD Test", tags=["legacy"])
