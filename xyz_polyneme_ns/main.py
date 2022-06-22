@@ -323,6 +323,37 @@ def jsonld_doc_response(jsonld_doc, accept):
     return response_for(g, accept)
 
 
+@app.get("/ark:57802/dw0/agu")
+async def agu_index_terms(accept: Optional[str] = Header(None)):
+    return response_for(
+        g=load_graph_from_file(
+            "agu_index_terms.ttl",
+            format_="turtle",
+        ),
+        accept=accept,
+    )
+
+
+@app.get("/ark:57802/dw0/agu/{code}")
+async def agu_index_term(code: str, accept: Optional[str] = Header(None)):
+    og = rdflib.Graph()
+    og.parse("agu_index_terms.ttl", format="turtle")
+    results = list(
+        og.query(
+            f"""SELECT ?t ?p ?o WHERE {{ ?t rdfs:comment "CODE: {code}" . ?t ?p ?o . }}"""
+        )
+    )
+    if len(results) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No AGU index term with code {code}",
+        )
+    g = rdflib.Graph()
+    for s, p, o in results:
+        g.add((s, p, o))
+    return response_for(g=g, accept=accept)
+
+
 @app.get("/2021/04/marda-dd/test", summary="MaRDA DD Test", tags=["legacy"])
 async def marda_dd_test(accept: Optional[str] = Header(None)):
     return response_for(
