@@ -326,12 +326,12 @@ def jsonld_doc_response(jsonld_doc, accept):
 QUERY_EVAL_ONTOLOGY_URL = "https://w3id.org/lode/owlapi/https://raw.githubusercontent.com/polyneme/ads-query-eval/main/query-eval.ttl"
 
 
-@app.get("/ark:57802/dw0/query-eval")
+@app.get("/ark:57802/dw0/queryeval")
 async def query_eval():
     return RedirectResponse(url=QUERY_EVAL_ONTOLOGY_URL, status_code=303)
 
 
-@app.get("/ark:57802/dw0/query-eval/{term}")
+@app.get("/ark:57802/dw0/queryeval/{term}")
 async def query_eval():
     return RedirectResponse(url=QUERY_EVAL_ONTOLOGY_URL, status_code=303)
 
