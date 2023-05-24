@@ -330,7 +330,7 @@ register_prefixed_path_url_converter("p0")
 
 
 @app.get(
-    "/ark:57802/{rest_of_path:prefixed_path_p0}",
+    "/ark:57802/{prefixed_path_p0:prefixed_path_p0}",
     response_class=RedirectResponse,
     tags=["util"],
     summary="Forward Shoulder ark:57802/p0 to other NMA",
