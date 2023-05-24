@@ -28,6 +28,7 @@ from pymongo.database import Database as MongoDatabase
 
 from xyz_polyneme_ns.auth import get_current_agent, get_password_hash
 from xyz_polyneme_ns.db import mongo_db
+from xyz_polyneme_ns.util import register_prefixed_path_url_converter
 from xyz_polyneme_ns.idgen import (
     ark_map,
     ark_naan_shoulder_map,
@@ -324,6 +325,21 @@ def jsonld_doc_response(jsonld_doc, accept):
 
 
 QUERY_EVAL_ONTOLOGY_URL = "https://w3id.org/lode/owlapi/https://raw.githubusercontent.com/polyneme/ads-query-eval/main/query-eval.ttl"
+
+register_prefixed_path_url_converter("p0")
+
+
+@app.get(
+    "/ark:57802/{rest_of_path:prefixed_path_p0}",
+    response_class=RedirectResponse,
+    tags=["util"],
+    summary="Forward Shoulder ark:57802/p0 to other NMA",
+)
+async def fwd_57802_p0(request: Request):
+    return RedirectResponse(
+        url=str(request.url).replace(API_HOST, "https://svc.polyneme.xyz"),
+        status_code=status.HTTP_302_FOUND,
+    )
 
 
 @app.get("/ark:57802/dw0/queryeval")

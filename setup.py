@@ -3,12 +3,6 @@ import setuptools
 with open("README.md") as f:
     long_description = f.read()
 
-with open("requirements/main.in") as f:
-    install_requires = f.read().splitlines()
-
-with open("requirements/dev.in") as f:
-    dev_requires = f.read().splitlines()[1:]  # Elide `-c main.txt` constraint
-
 setuptools.setup(
     name="xyz_polyneme_ns",
     url="https://github.com/polyneme/ns",
@@ -25,11 +19,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
     ],
-    install_requires=install_requires,
-    extras_require={
-        "dev": dev_requires,
-    },
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     entry_points={
         "console_scripts": [
             "termeric = xyz_polyneme_ns.cli.main:app",

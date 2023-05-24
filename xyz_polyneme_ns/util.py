@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from pathlib import Path
 from starlette import status
+from starlette.convertors import Convertor, register_url_convertor
 
 from toolz import keyfilter
 
@@ -74,3 +75,16 @@ def expiry_dt_from_now(days=0, hours=0, minutes=0, seconds=0):
 
 def has_passed(dt):
     return now() > dt
+
+
+def register_prefixed_path_url_converter(prefix: str):
+    class PrefixedPathConverter(Convertor):
+        regex = rf"{prefix}.+"
+
+        def convert(self, value: str) -> str:
+            return str(value)
+
+        def to_string(self, value: str) -> str:
+            return str(value)
+
+    register_url_convertor(f"prefixed_path_{prefix}", PrefixedPathConverter())
