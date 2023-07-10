@@ -326,20 +326,27 @@ def jsonld_doc_response(jsonld_doc, accept):
 
 QUERY_EVAL_ONTOLOGY_URL = "https://w3id.org/lode/owlapi/https://raw.githubusercontent.com/polyneme/ads-query-eval/main/query-eval.ttl"
 
-register_prefixed_path_url_converter("p0")
 
-
-@app.get(
-    "/ark:57802/{prefixed_path_p0:prefixed_path_p0}",
-    response_class=RedirectResponse,
-    tags=["util"],
-    summary="Forward Shoulder ark:57802/p0 to other NMA",
-)
-async def fwd_57802_p0(request: Request):
-    return RedirectResponse(
-        url=str(request.url).replace(API_HOST, "https://svc.polyneme.xyz"),
-        status_code=status.HTTP_302_FOUND,
+def fwd_57802_pfx(pfx, api_host="https://svc.polyneme.xyz"):
+    @app.get(
+        f"/ark:57802/{{prefixed_path_{pfx}:prefixed_path_{pfx}}}",
+        response_class=RedirectResponse,
+        tags=["util"],
+        summary=f"Forward Shoulder ark:57802/{pfx} to other NMA",
     )
+    async def fn(request: Request):
+        return RedirectResponse(
+            url=str(request.url).replace(API_HOST, api_host),
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    return fn
+
+
+register_prefixed_path_url_converter("p0")
+fwd_57802_p0 = fwd_57802_pfx("p0")
+register_prefixed_path_url_converter("mkg0")
+fwd_57802_mkg0 = fwd_57802_pfx("mkg0")
 
 
 @app.get("/ark:57802/dw0/queryeval")

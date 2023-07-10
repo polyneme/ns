@@ -29,7 +29,7 @@ class Doc(BaseModel):
 
 
 TermUri = constr(
-    regex=r"ark:(?P<naan>\d{5,})/(?P<year>\d{4})/(?P<month>\d{2})/(?P<org>\w+)/(?P<repo>\w+)/(?P<term>\w+)"
+    pattern=r"ark:(?P<naan>\d{5,})/(?P<year>\d{4})/(?P<month>\d{2})/(?P<org>\w+)/(?P<repo>\w+)/(?P<term>\w+)"
 )
 
 
@@ -40,11 +40,11 @@ class TermImport(BaseModel):
 # NO i, l, o or u.
 BASE32_LETTERS = "abcdefghjkmnpqrstvwxyz"
 
-Username = constr(regex=r"[a-zA-Z0-9_]+")
-Org = constr(regex=r"[a-zA-Z0-9_]+")
-Repo = constr(regex=r"[a-zA-Z0-9_]+/[a-zA-Z0-9_]+")
-Ark = constr(regex=r"^ark:[^/]+/.+$")
-ArkShoulder = constr(regex=rf"^[{BASE32_LETTERS}]+\d$")
+Username = constr(pattern=r"[a-zA-Z0-9_]+")
+Org = constr(pattern=r"[a-zA-Z0-9_]+")
+Repo = constr(pattern=r"[a-zA-Z0-9_]+/[a-zA-Z0-9_]+")
+Ark = constr(pattern=r"^ark:[^/]+/.+$")
+ArkShoulder = constr(pattern=rf"^[{BASE32_LETTERS}]+\d$")
 # XXX In practice, every assigned NAAN has consisted of exactly five digits.
 # However, the spec says that NAANs are opaque strings of one or more "betanumeric" characters.
 # So prepare to swap the ArkNaan line below for:
@@ -54,7 +54,7 @@ ArkShoulder = constr(regex=rf"^[{BASE32_LETTERS}]+\d$")
 # J. A. Kunze, "The ARK Identifier Scheme (v.27)."
 # Internet Engineering Task Force (IETF), Feb. 2021. [Online].
 # Available: https://www.ietf.org/archive/id/draft-kunze-ark-27.txt
-BetanumericStr = constr(regex=r"^[0123456789bcdfghjkmnpqrstvwxz]+$")
+BetanumericStr = constr(pattern=r"^[0123456789bcdfghjkmnpqrstvwxz]+$")
 ArkNaan = conint(ge=10000, lt=100000)  # exactly five digits
 
 pattern_shoulder = re.compile(rf"(?P<shoulder>[{BASE32_LETTERS}]+\d)")
@@ -74,7 +74,7 @@ class AgentIn(BaseModel):
 
 
 AgentUri = constr(
-    regex=r"ark:(?P<naan>\d{5,})/9999/12/system/agents/(?P<username>[a-zA-Z0-9_]+)"
+    pattern=r"ark:(?P<naan>\d{5,})/9999/12/system/agents/(?P<username>[a-zA-Z0-9_]+)"
 )
 
 
