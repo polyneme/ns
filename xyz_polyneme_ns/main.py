@@ -344,7 +344,7 @@ def fwd_57802_pfx(pfx, api_host="https://svc.polyneme.xyz"):
 
 
 register_prefixed_path_url_converter("p0")
-fwd_57802_p0 = fwd_57802_pfx("p0")
+fwd_57802_p0 = fwd_57802_pfx("p0", api_host="https://svc.polyneme.xyz/pids")
 register_prefixed_path_url_converter("mkg0")
 fwd_57802_mkg0 = fwd_57802_pfx("mkg0", api_host="https://svc.polyneme.xyz/pids")
 
