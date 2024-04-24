@@ -347,6 +347,8 @@ register_prefixed_path_url_converter("p0")
 fwd_57802_p0 = fwd_57802_pfx("p0", api_host="https://svc.polyneme.xyz/pids")
 register_prefixed_path_url_converter("mkg0")
 fwd_57802_mkg0 = fwd_57802_pfx("mkg0", api_host="https://svc.polyneme.xyz/pids")
+register_prefixed_path_url_converter("fk0")
+fwd_57802_mkg0 = fwd_57802_pfx("fk0", api_host="https://arklet.polyneme.xyz")
 
 
 @app.get("/ark:57802/dw0/queryeval")
